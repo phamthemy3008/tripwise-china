@@ -45,4 +45,6 @@ export interface TripDocument {
   source_doc_url?: string;
   source_doc_id?: string;
   last_synced_at?: number;
+  shared_at?: number;
+  is_shared?: boolean;
 }

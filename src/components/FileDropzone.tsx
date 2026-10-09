@@ -61,8 +61,8 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
 
   const handleFile = (file: File) => {
     const ext = file.name.split(".").pop()?.toLowerCase();
-    if (ext !== "docx" && ext !== "txt" && ext !== "md") {
-      toast.error("Vui lòng chọn file định dạng .docx, .txt hoặc .md");
+    if (ext !== "json" && ext !== "docx" && ext !== "txt" && ext !== "md") {
+      toast.error("Vui lòng chọn file định dạng .json, .docx, .txt hoặc .md");
       return;
     }
     setSelectedFile(file);
@@ -71,7 +71,7 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
 
   const handleSubmit = async () => {
     if (activeTab === "file" && !selectedFile) {
-      toast.warning("Vui lòng tải lên file lịch trình .docx, .txt hoặc .md");
+      toast.warning("Vui lòng tải lên file lịch trình .json, .docx, .txt hoặc .md");
       return;
     }
     if (activeTab === "text" && !textInput.trim()) {
@@ -86,11 +86,52 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
     setIsProcessing(true);
     const toastId = toast.loading(
       activeTab === "gdoc"
-        ? "Đang đọc tài liệu Google Docs / Drive & AI phân tích..."
-        : "Gemini AI đang trích xuất dữ liệu lịch trình..."
+        ? "Đang đọc Google Docs & AI quét tách từng ngày..."
+        : "Hệ thống đang quét tách từng ngày (Chunk Scanning)..."
     );
 
     try {
+      // Fast path: If client uploaded a .json file, parse directly in browser with 100% fidelity
+      if (activeTab === "file" && selectedFile && selectedFile.name.toLowerCase().endsWith(".json")) {
+        try {
+          const text = await selectedFile.text();
+          const jsonParsed = JSON.parse(text);
+          if (jsonParsed.trip_title && Array.isArray(jsonParsed.days)) {
+            if (!jsonParsed.id) jsonParsed.id = `trip_${Date.now()}`;
+            if (!jsonParsed.created_at) jsonParsed.created_at = Date.now();
+            toast.success(
+              `Đã nạp chính xác 100% tất cả ${jsonParsed.days.length} ngày từ file JSON!`,
+              { id: toastId }
+            );
+            onParsedSuccess(jsonParsed);
+            setIsProcessing(false);
+            return;
+          }
+        } catch (jsonErr: any) {
+          console.warn("Client JSON parse error, falling back to server:", jsonErr);
+        }
+      }
+
+      // Fast path: If user pasted raw JSON
+      if (activeTab === "text" && textInput.trim().startsWith("{")) {
+        try {
+          const jsonParsed = JSON.parse(textInput.trim());
+          if (jsonParsed.trip_title && Array.isArray(jsonParsed.days)) {
+            if (!jsonParsed.id) jsonParsed.id = `trip_${Date.now()}`;
+            if (!jsonParsed.created_at) jsonParsed.created_at = Date.now();
+            toast.success(
+              `Đã nạp chính xác 100% tất cả ${jsonParsed.days.length} ngày!`,
+              { id: toastId }
+            );
+            onParsedSuccess(jsonParsed);
+            setIsProcessing(false);
+            return;
+          }
+        } catch {
+          // continue with chunk scanner
+        }
+      }
+
       if (activeTab === "gdoc") {
         const response = await fetch("/api/fetch-google-doc", {
           method: "POST",
@@ -106,7 +147,10 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
           throw new Error(resJson.error || "Không thể đọc nội dung Google Docs");
         }
 
-        toast.success("Trích xuất Google Docs thành công!", { id: toastId });
+        toast.success(
+          `Trích xuất thành công ${resJson.data.days?.length || 0} ngày từ Google Docs!`,
+          { id: toastId }
+        );
         onParsedSuccess(resJson.data);
       } else {
         const formData = new FormData();
@@ -126,14 +170,35 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
           throw new Error(resJson.error || "Không thể phân tích dữ liệu lịch trình");
         }
 
-        toast.success("Trích xuất lịch trình thành công bằng Gemini AI!", {
-          id: toastId,
-        });
+        toast.success(
+          `Đã quét và trích xuất thành công trọn vẹn ${resJson.data.days?.length || 0} ngày!`,
+          { id: toastId }
+        );
         onParsedSuccess(resJson.data);
       }
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || "Lỗi khi xử lý lịch trình", { id: toastId });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleLoadOfficial16Days = async () => {
+    setIsProcessing(true);
+    const toastId = toast.loading("Đang nạp trực tiếp toàn bộ 16 ngày lịch trình chính thức...");
+    try {
+      const res = await fetch("/itinerary_16_days_zhangjiajie_chongqing_chengdu.json");
+      if (!res.ok) throw new Error("Không thể tải file mẫu");
+      const data = await res.json();
+      if (!data.id) data.id = `trip_16d_${Date.now()}`;
+      toast.success(`Nạp thành công đầy đủ 100% cả 16 ngày (${data.days?.length} ngày)!`, {
+        id: toastId,
+      });
+      onParsedSuccess(data);
+    } catch {
+      onSelectSample("trip_zhangjiajie_chengdu_16d15n");
+      toast.success("Đã nạp lịch trình mẫu 16 ngày!", { id: toastId });
     } finally {
       setIsProcessing(false);
     }
@@ -167,7 +232,7 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
       </div>
 
       {/* Tabs */}
-      <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl max-w-md mx-auto mb-5 overflow-x-auto">
+      <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl max-w-md mx-auto mb-4 overflow-x-auto">
         <button
           type="button"
           onClick={() => setActiveTab("gdoc")}
@@ -191,7 +256,7 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
           }`}
         >
           <UploadCloud className="w-3.5 h-3.5" />
-          <span>File Word (.docx)</span>
+          <span>File Word (.docx) / JSON</span>
         </button>
 
         <button
@@ -206,6 +271,20 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
           <FileText className="w-3.5 h-3.5" />
           <span>Dán văn bản</span>
         </button>
+      </div>
+
+      {/* Chunk Scanning Feature Notice */}
+      <div className="mb-5 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-start gap-2.5">
+        <Sparkles className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+        <div className="text-left text-xs">
+          <p className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+            <span>✨ Tính Năng Mới: Quét Tách Từng Ngày (Chunk Scanner)</span>
+            <span className="px-1.5 py-0.2 bg-amber-500/20 text-amber-700 dark:text-amber-300 text-[10px] rounded-md font-extrabold uppercase">100% Đầy Đủ</span>
+          </p>
+          <p className="text-slate-600 dark:text-slate-400 text-[11px] mt-0.5">
+            Dù tài liệu có 1 ngày, 5 ngày hay 16 ngày, hệ thống sẽ tự động bóc tách từng chặng và quét lần lượt, không bao giờ bị cắt ngắn hoặc chỉ dừng lại ở 2 ngày.
+          </p>
+        </div>
       </div>
 
       {/* Google Docs Tab */}
@@ -296,7 +375,7 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".docx,.txt,.md"
+            accept=".json,.docx,.txt,.md"
             className="hidden"
             onChange={handleFileChange}
           />
@@ -326,7 +405,7 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
                 </span>
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Hỗ trợ Microsoft Word (.docx), Text (.txt), Markdown (.md)
+                Hỗ trợ JSON (.json), Microsoft Word (.docx), Text (.txt), Markdown (.md)
               </p>
             </div>
           )}
@@ -373,12 +452,47 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
         </button>
       </div>
 
-      {/* Quick Sample Selector */}
+      {/* Quick Sample Selector & Official 16-Day Trip */}
       <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800">
+        {/* Featured 16-Day Official Itinerary */}
+        <div className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/5 border border-amber-500/30">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-500 text-slate-950 text-[10px] font-black uppercase mb-1">
+                ⭐ Lịch trình chính thức 16 ngày (14/11 – 29/11/2026)
+              </div>
+              <h4 className="text-sm font-extrabold text-slate-900 dark:text-white">
+                Trương Gia Giới – Vũ Long – Trùng Khánh – Thành Đô – Nga Mi Sơn
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                16 ngày 15 đêm &bull; Đầy đủ 6 khách sạn, vé máy bay, tàu cao tốc, Amap &amp; ẩm thực chi tiết 100%
+              </p>
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+              <a
+                href="/itinerary_16_days_zhangjiajie_chongqing_chengdu.json"
+                download="Lich_Trinh_16_Ngay_Chinh_Thuc.json"
+                className="flex-1 sm:flex-none px-3 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold text-center transition-colors cursor-pointer"
+                title="Tải file JSON chuẩn để lưu trữ hoặc nạp lại bất cứ lúc nào"
+              >
+                📥 Tải file JSON
+              </a>
+              <button
+                type="button"
+                onClick={handleLoadOfficial16Days}
+                className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Nạp Ngay 16 Ngày Chuẩn</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
             <FileCode className="w-3.5 h-3.5 text-amber-500" />
-            Lịch trình mẫu có sẵn (Thử nghiệm ngay):
+            Lịch trình mẫu khác:
           </span>
         </div>
 

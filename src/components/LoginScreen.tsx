@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import {
   Compass,
@@ -10,10 +10,28 @@ import {
   Sparkles,
   ArrowRight,
   AlertTriangle,
+  Link2,
 } from "lucide-react";
 
 export const LoginScreen: React.FC = () => {
   const { signInWithGoogle, isConfigured } = useAuth();
+  const [shareInput, setShareInput] = useState("");
+
+  const handleOpenSharedTrip = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!shareInput.trim()) return;
+    let code = shareInput.trim();
+    try {
+      if (code.includes("http://") || code.includes("https://")) {
+        const url = new URL(code);
+        const param = url.searchParams.get("share") || url.searchParams.get("trip");
+        if (param) code = param;
+      }
+    } catch {
+      // ignore
+    }
+    window.location.search = `?share=${encodeURIComponent(code)}`;
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white flex flex-col justify-between p-4 sm:p-6 font-sans">
@@ -130,6 +148,33 @@ export const LoginScreen: React.FC = () => {
           <p className="text-[11px] text-slate-500 text-center mt-4">
             Bằng việc đăng nhập, lịch trình của bạn được bảo mật riêng tư trên Cloud Firestore cá nhân.
           </p>
+
+          {/* Direct Share Link Viewer (No Login Required) */}
+          <div className="mt-6 pt-5 border-t border-slate-800">
+            <div className="text-center mb-2.5">
+              <span className="text-[11px] text-amber-300 font-semibold flex items-center justify-center gap-1.5">
+                <Link2 className="w-3.5 h-3.5 text-amber-400" />
+                <span>Xem lịch trình chia sẻ (Không cần đăng nhập)</span>
+              </span>
+            </div>
+
+            <form onSubmit={handleOpenSharedTrip} className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Dán link hoặc mã chia sẻ..."
+                value={shareInput}
+                onChange={(e) => setShareInput(e.target.value)}
+                className="flex-1 bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={!shareInput.trim()}
+                className="py-2 px-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-amber-300 text-xs font-bold border border-slate-700 transition-colors cursor-pointer shrink-0"
+              >
+                Mở Xem
+              </button>
+            </form>
+          </div>
         </div>
       </div>
 

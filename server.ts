@@ -2,6 +2,8 @@ import express, { Request, Response } from "express";
 import multer from "multer";
 import mammoth from "mammoth";
 import dotenv from "dotenv";
+import fs from "fs";
+import path from "path";
 import { parseTripWithGemini, suggestActivities } from "./src/lib/gemini.js";
 import { SAMPLE_TRIPS } from "./src/data/sampleTrips.js";
 
@@ -9,6 +11,52 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Setup persistent data storage for shared trips & itineraries
+const DATA_DIR = path.resolve(process.cwd(), "data");
+const SHARED_TRIPS_FILE = path.join(DATA_DIR, "shared_trips.json");
+
+function ensureDataDir() {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+}
+
+function loadSharedTrips(): Record<string, any> {
+  ensureDataDir();
+  const map: Record<string, any> = {};
+  // Pre-seed with SAMPLE_TRIPS so their IDs are directly shareable
+  for (const sample of SAMPLE_TRIPS) {
+    if (sample.id) {
+      map[sample.id] = sample;
+    }
+  }
+
+  if (fs.existsSync(SHARED_TRIPS_FILE)) {
+    try {
+      const fileData = fs.readFileSync(SHARED_TRIPS_FILE, "utf-8");
+      const parsed = JSON.parse(fileData);
+      if (parsed && typeof parsed === "object") {
+        Object.assign(map, parsed);
+      }
+    } catch (e) {
+      console.warn("Could not read shared_trips.json, using defaults:", e);
+    }
+  }
+  return map;
+}
+
+const sharedTripsStore = loadSharedTrips();
+
+function persistSharedTrip(id: string, trip: any) {
+  try {
+    ensureDataDir();
+    sharedTripsStore[id] = trip;
+    fs.writeFileSync(SHARED_TRIPS_FILE, JSON.stringify(sharedTripsStore, null, 2), "utf-8");
+  } catch (err) {
+    console.error("Failed to persist shared trip to disk:", err);
+  }
+}
 
 // Setup Multer for in-memory file parsing (.docx, .txt, .md)
 const upload = multer({
@@ -35,19 +83,55 @@ app.post(
         const buffer = req.file.buffer;
         const fileName = req.file.originalname.toLowerCase();
 
-        if (fileName.endsWith(".docx")) {
+        if (fileName.endsWith(".json")) {
+          try {
+            const jsonParsed = JSON.parse(buffer.toString("utf-8"));
+            if (jsonParsed.trip_title && Array.isArray(jsonParsed.days)) {
+              if (!jsonParsed.id) {
+                jsonParsed.id = `trip_${Date.now()}`;
+              }
+              if (!jsonParsed.created_at) {
+                jsonParsed.created_at = Date.now();
+              }
+              serverTrips.unshift(jsonParsed);
+              res.json({
+                success: true,
+                data: jsonParsed,
+              });
+              return;
+            }
+          } catch (e: any) {
+            res.status(400).json({ error: "File JSON không hợp lệ: " + e.message });
+            return;
+          }
+        } else if (fileName.endsWith(".docx")) {
           const result = await mammoth.extractRawText({ buffer });
           extractedText = result.value;
         } else if (fileName.endsWith(".txt") || fileName.endsWith(".md")) {
           extractedText = buffer.toString("utf-8");
         } else {
           res.status(400).json({
-            error: "Định dạng file không hỗ trợ. Vui lòng tải file .docx, .txt hoặc .md",
+            error: "Định dạng file không hỗ trợ. Vui lòng tải file .json, .docx, .txt hoặc .md",
           });
           return;
         }
       } else if (req.body?.text) {
         extractedText = req.body.text;
+        // Check if raw text is JSON format
+        if (extractedText.trim().startsWith("{")) {
+          try {
+            const jsonParsed = JSON.parse(extractedText.trim());
+            if (jsonParsed.trip_title && Array.isArray(jsonParsed.days)) {
+              if (!jsonParsed.id) jsonParsed.id = `trip_${Date.now()}`;
+              if (!jsonParsed.created_at) jsonParsed.created_at = Date.now();
+              serverTrips.unshift(jsonParsed);
+              res.json({ success: true, data: jsonParsed });
+              return;
+            }
+          } catch {
+            // continue with AI parsing
+          }
+        }
       } else {
         res.status(400).json({
           error: "Vui lòng tải lên file hoặc nhập nội dung văn bản lịch trình.",
@@ -528,17 +612,90 @@ app.post("/api/trips", (req: Request, res: Response) => {
     res.status(400).json({ error: "Dữ liệu lịch trình không hợp lệ" });
     return;
   }
-  const index = serverTrips.findIndex((t) => t.id === trip.id);
+  const tripId = trip.id || `trip_${Date.now()}`;
+  const preparedTrip = { ...trip, id: tripId };
+  
+  const index = serverTrips.findIndex((t) => t.id === tripId);
   if (index >= 0) {
-    serverTrips[index] = trip;
+    serverTrips[index] = preparedTrip;
   } else {
-    serverTrips.unshift(trip);
+    serverTrips.unshift(preparedTrip);
   }
-  res.json({ success: true, data: trip });
+  persistSharedTrip(tripId, preparedTrip);
+  res.json({ success: true, data: preparedTrip });
+});
+
+// API: Share Itinerary publicly (Generate permanent share ID and persist)
+app.post("/api/share", (req: Request, res: Response) => {
+  try {
+    const { trip } = req.body;
+    if (!trip || !trip.trip_title || !Array.isArray(trip.days)) {
+      res.status(400).json({ error: "Dữ liệu lịch trình không hợp lệ để chia sẻ" });
+      return;
+    }
+    const shareId = trip.id || `trip_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const sharedTrip = {
+      ...trip,
+      id: shareId,
+      shared_at: Date.now(),
+      is_shared: true,
+    };
+
+    // Save to disk store
+    persistSharedTrip(shareId, sharedTrip);
+
+    // Keep in serverTrips list
+    const existingIdx = serverTrips.findIndex((t) => t.id === shareId);
+    if (existingIdx >= 0) {
+      serverTrips[existingIdx] = sharedTrip;
+    } else {
+      serverTrips.unshift(sharedTrip);
+    }
+
+    res.json({
+      success: true,
+      shareId,
+      data: sharedTrip,
+    });
+  } catch (error: any) {
+    console.error("Share Itinerary Error:", error);
+    res.status(500).json({ error: error.message || "Lỗi khi chia sẻ lịch trình" });
+  }
+});
+
+// API: Get Shared Itinerary by shareId (Accessible publicly without authentication)
+app.get("/api/share/:id", (req: Request, res: Response) => {
+  const id = req.params.id;
+  // 1. Check persistent sharedTripsStore
+  if (sharedTripsStore[id]) {
+    res.json({ success: true, data: sharedTripsStore[id] });
+    return;
+  }
+  // 2. Check serverTrips
+  const fromServer = serverTrips.find((t) => t.id === id);
+  if (fromServer) {
+    res.json({ success: true, data: fromServer });
+    return;
+  }
+  // 3. Check SAMPLE_TRIPS
+  const fromSample = SAMPLE_TRIPS.find((t) => t.id === id);
+  if (fromSample) {
+    res.json({ success: true, data: fromSample });
+    return;
+  }
+  res.status(404).json({
+    success: false,
+    error: "Không tìm thấy lịch trình được chia sẻ hoặc liên kết không tồn tại.",
+  });
 });
 
 app.get("/api/trips/:id", (req: Request, res: Response) => {
-  const trip = serverTrips.find((t) => t.id === req.params.id);
+  const id = req.params.id;
+  const trip =
+    serverTrips.find((t) => t.id === id) ||
+    sharedTripsStore[id] ||
+    SAMPLE_TRIPS.find((t) => t.id === id);
+
   if (!trip) {
     res.status(404).json({ error: "Không tìm thấy chuyến đi" });
     return;
