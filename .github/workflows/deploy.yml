@@ -1,9 +1,6 @@
 name: Deploy to Proxmox LXC via GitHub Runner
 
 on:
-  push:
-    branches:
-      - main
   release:
     types: [published]
   workflow_dispatch:
