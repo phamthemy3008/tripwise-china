@@ -2,7 +2,7 @@ import express, { Request, Response } from "express";
 import multer from "multer";
 import mammoth from "mammoth";
 import dotenv from "dotenv";
-import { parseTripWithGemini } from "./src/lib/gemini.js";
+import { parseTripWithGemini, suggestActivities } from "./src/lib/gemini.js";
 import { SAMPLE_TRIPS } from "./src/data/sampleTrips.js";
 
 dotenv.config();
@@ -246,6 +246,27 @@ app.post("/api/sync-google-doc", async (req: Request, res: Response) => {
     res.status(500).json({
       error: error.message || "Lỗi đồng bộ Google Docs",
     });
+  }
+});
+
+// API: Suggest activities for city/day
+app.post("/api/suggest-activities", async (req: Request, res: Response) => {
+  try {
+    const { city, dayNumber, existingPlaces, category } = req.body;
+    if (!city) {
+      res.status(400).json({ error: "Thiếu thông tin thành phố." });
+      return;
+    }
+    const suggestions = await suggestActivities({
+      city,
+      dayNumber: Number(dayNumber) || 1,
+      existingPlaces: existingPlaces || [],
+      category: category || "all",
+    });
+    res.json({ success: true, data: suggestions });
+  } catch (error: any) {
+    console.error("Suggest activities error:", error);
+    res.status(500).json({ error: error.message || "Lỗi khi gợi ý địa điểm" });
   }
 });
 

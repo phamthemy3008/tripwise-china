@@ -15,6 +15,9 @@ export interface ActivityEvent {
   amap_query?: string;
   dishes?: DishItem[];
   tips?: string;
+  transport_hint?: string;
+  ticket_hint?: string;
+  duration_hint?: string;
 }
 
 export interface HotelInfo {

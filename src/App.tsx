@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Toaster, toast } from "sonner";
-import { TripDocument } from "./types/itinerary";
+import { TripDocument, ActivityEvent } from "./types/itinerary";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { LoginScreen } from "./components/LoginScreen";
 import {
@@ -9,11 +9,12 @@ import {
   deleteUserTrip,
 } from "./lib/firestoreTrips";
 import { SAMPLE_TRIPS } from "./data/sampleTrips";
-import { DayTabs } from "./components/DayTabs";
+import { DayTabs, checkIsToday } from "./components/DayTabs";
 import { TimelineCard } from "./components/TimelineCard";
 import { HotelCard } from "./components/HotelCard";
 import { FileDropzone } from "./components/FileDropzone";
 import { ChinaSurvivalGuide } from "./components/ChinaSurvivalGuide";
+import { SuggestActivitiesModal } from "./components/SuggestActivitiesModal";
 import {
   Compass,
   Plus,
@@ -51,6 +52,7 @@ function MainApp() {
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [isLoadingTrips, setIsLoadingTrips] = useState<boolean>(true);
   const [isSyncingGoogleDoc, setIsSyncingGoogleDoc] = useState<boolean>(false);
+  const [isSuggestModalOpen, setIsSuggestModalOpen] = useState<boolean>(false);
 
   // Load user-specific trips whenever user changes
   useEffect(() => {
@@ -103,15 +105,58 @@ function MainApp() {
   }
 
   const currentTrip = trips.find((t) => t.id === currentTripId) || trips[0];
+
+  // Auto-detect which day corresponds to Today
+  const detectedTodayNumber =
+    currentTrip?.days?.find((d) => checkIsToday(d.date))?.day_number || null;
+
+  // Auto-select Today on initial trip load
+  useEffect(() => {
+    if (detectedTodayNumber) {
+      setSelectedDayNumber(detectedTodayNumber);
+    }
+  }, [currentTripId, detectedTodayNumber]);
+
   const activeDayPlan =
     currentTrip?.days?.find((d) => d.day_number === selectedDayNumber) ||
     currentTrip?.days?.[0];
 
   const handleSelectTrip = (id: string) => {
     setCurrentTripId(id);
-    setSelectedDayNumber(1);
+    const target = trips.find((t) => t.id === id);
+    const todayMatch = target?.days?.find((d) => checkIsToday(d.date))?.day_number;
+    setSelectedDayNumber(todayMatch || 1);
     setIsTripsDrawerOpen(false);
-    toast.info("Đã chuyển sang lịch trình mới");
+    toast.info(
+      todayMatch
+        ? `Đã mở lịch trình - Tự động chọn Hôm nay (Ngày ${todayMatch})`
+        : "Đã chuyển sang lịch trình mới"
+    );
+  };
+
+  const handleAddEventToActiveDay = async (newEvent: ActivityEvent) => {
+    if (!currentTrip || !activeDayPlan || !user) return;
+    const updatedDays = currentTrip.days.map((day) => {
+      if (day.day_number === activeDayPlan.day_number) {
+        return {
+          ...day,
+          events: [...day.events, newEvent],
+        };
+      }
+      return day;
+    });
+
+    const updatedTrip: TripDocument = {
+      ...currentTrip,
+      days: updatedDays,
+    };
+
+    try {
+      const updatedTrips = await saveUserTrip(user.uid, updatedTrip);
+      setTrips(updatedTrips);
+    } catch {
+      toast.error("Không thể lưu địa điểm mới.");
+    }
   };
 
   const handleImportParsed = async (newTrip: TripDocument) => {
@@ -424,6 +469,7 @@ function MainApp() {
             <DayTabs
               days={currentTrip.days}
               selectedDay={selectedDayNumber}
+              todayDayNumber={detectedTodayNumber}
               onSelectDay={(dayNum) => {
                 setSelectedDayNumber(dayNum);
                 window.scrollTo({ top: 120, behavior: "smooth" });
@@ -456,16 +502,37 @@ function MainApp() {
 
                 {/* Timeline Events Section */}
                 <div className="mt-6">
-                  <div className="flex items-center justify-between mb-4 px-1">
+                  <div className="flex items-center justify-between mb-4 px-1 flex-wrap gap-2">
                     <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                       Lịch trình chi tiết trong ngày ({activeDayPlan.events.length} hoạt động)
                     </h3>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsSuggestModalOpen(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 text-xs font-black shadow-xs hover:brightness-105 transition-all cursor-pointer active:scale-95 no-print"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Gợi ý thêm điểm đến</span>
+                    </button>
                   </div>
 
                   <div className="space-y-1">
                     {activeDayPlan.events.map((event, idx) => (
                       <TimelineCard key={idx} event={event} index={idx} />
                     ))}
+                  </div>
+
+                  {/* Add more activity prompt banner at bottom */}
+                  <div className="mt-4 pt-1 no-print">
+                    <button
+                      type="button"
+                      onClick={() => setIsSuggestModalOpen(true)}
+                      className="w-full p-4 rounded-2xl border-2 border-dashed border-amber-300 dark:border-amber-700/60 bg-amber-50/50 dark:bg-amber-950/15 hover:bg-amber-100/60 dark:hover:bg-amber-950/30 text-amber-900 dark:text-amber-200 transition-all text-xs font-bold flex items-center justify-center gap-2 cursor-pointer group"
+                    >
+                      <Sparkles className="w-4 h-4 text-amber-500 group-hover:rotate-12 transition-transform" />
+                      <span>Bạn muốn khám phá thêm điểm nào tại <strong>{activeDayPlan.city}</strong>? Bấm để AI gợi ý!</span>
+                    </button>
                   </div>
                 </div>
 
@@ -670,6 +737,18 @@ function MainApp() {
         isOpen={isSurvivalGuideOpen}
         onClose={() => setIsSurvivalGuideOpen(false)}
       />
+
+      {/* Suggest Activities Modal */}
+      {activeDayPlan && (
+        <SuggestActivitiesModal
+          isOpen={isSuggestModalOpen}
+          onClose={() => setIsSuggestModalOpen(false)}
+          city={activeDayPlan.city}
+          dayNumber={activeDayPlan.day_number}
+          existingPlaces={activeDayPlan.events.map((e) => e.place_name)}
+          onAddEventToDay={handleAddEventToActiveDay}
+        />
+      )}
 
       {/* Global Toast Container */}
       <Toaster position="top-center" richColors />

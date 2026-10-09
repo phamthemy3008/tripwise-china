@@ -67,6 +67,9 @@ ${rawText}`;
                   place_name: { type: Type.STRING, description: "Tên địa danh tiếng Việt" },
                   place_zh: { type: Type.STRING, description: "Tên địa danh chữ Hán chuẩn" },
                   amap_query: { type: Type.STRING, description: "Từ khóa định vị tìm kiếm trên Gaode Amap" },
+                  transport_hint: { type: Type.STRING, description: "Tuyến Metro / Tàu điện ngầm / Phương tiện di chuyển cụ thể, ví dụ: Metro Line 1 ga Thiên An Môn Đông" },
+                  ticket_hint: { type: Type.STRING, description: "Thông tin vé vào cửa, giá vé ước tính hoặc lưu ý đặt vé trước (ví dụ: 60 RMB, cần đặt trước 7 ngày trên mini-app WeChat)" },
+                  duration_hint: { type: Type.STRING, description: "Thời lượng tham quan ước tính, ví dụ: 2.5 - 3 tiếng" },
                   tips: { type: Type.STRING, description: "Lưu ý di chuyển, vé vào cửa hoặc trang phục" },
                   dishes: {
                     type: Type.ARRAY,
@@ -125,4 +128,86 @@ ${rawText}`;
   throw new Error(
     `Không thể phân tích bằng AI (Đã thử qua các model: ${CANDIDATE_MODELS.join(", ")}): ${lastError?.message || "Rate limit"}`
   );
+}
+
+// API: Suggest exciting places / activities to add to itinerary
+export async function suggestActivities(params: {
+  city: string;
+  dayNumber: number;
+  existingPlaces?: string[];
+  category?: string;
+}): Promise<any[]> {
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY chưa được cấu hình trên máy chủ.");
+  }
+
+  const prompt = `Bạn là hướng dẫn viên du lịch chuyên gia về Trung Quốc.
+Người dùng đang có lịch trình tại thành phố: "${params.city}" vào Ngày ${params.dayNumber}.
+Các địa điểm họ ĐÃ CÓ trong ngày này: ${params.existingPlaces?.join(", ") || "Chưa có"}.
+Thể loại mong muốn: ${params.category || "Tất cả (Điểm ngắm cảnh, ẩm thực, trải nghiệm văn hóa, check-in hot trend)"}.
+
+Hãy gợi ý từ 3 đến 5 hoạt động / địa điểm du lịch THẬT SỰ ĐẶC SẮC và HẤP DẪN tại ${params.city} để người dùng có thể chọn thêm vào ngày này.
+Đảm bảo:
+1. Không trùng với các địa điểm đã có.
+2. Cung cấp tên tiếng Trung chữ Hán chuẩn xác (place_zh) để tra cứu Amap.
+3. Cung cấp hướng dẫn Metro / tàu điện ngầm (transport_hint).
+4. Thông tin giá vé hoặc đặt trước (ticket_hint).
+5. Món ăn đặc sản gần đó (dishes).`;
+
+  const schema = {
+    type: Type.ARRAY,
+    items: {
+      type: Type.OBJECT,
+      properties: {
+        time_slot: { type: Type.STRING, description: "Sáng | Chiều | Tối" },
+        time_range: { type: Type.STRING, description: "Khoảng thời gian ví dụ 14:00 - 16:30" },
+        activity_title: { type: Type.STRING, description: "Tiêu đề hoạt động hấp dẫn" },
+        description: { type: Type.STRING, description: "Mô tả chi tiết điểm nổi bật" },
+        place_name: { type: Type.STRING, description: "Tên địa danh tiếng Việt" },
+        place_zh: { type: Type.STRING, description: "Tên địa danh chữ Hán chuẩn xác" },
+        amap_query: { type: Type.STRING, description: "Từ khóa định vị trên Gaode Amap" },
+        transport_hint: { type: Type.STRING, description: "Tuyến Metro / Đi lại thuận tiện" },
+        ticket_hint: { type: Type.STRING, description: "Thông tin vé tham quan hoặc đặt trước" },
+        duration_hint: { type: Type.STRING, description: "Thời gian ước tính ví dụ 2 tiếng" },
+        tips: { type: Type.STRING, description: "Mẹo thực tế khi đến đây" },
+        dishes: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              dish_name_vn: { type: Type.STRING, description: "Tên món ăn tiếng Việt" },
+              dish_name_zh: { type: Type.STRING, description: "Tên món ăn chữ Hán" },
+              google_img_keyword: { type: Type.STRING, description: "Từ khóa tra ảnh Google" },
+              baidu_img_keyword: { type: Type.STRING, description: "Từ khóa tra ảnh Baidu" },
+            },
+            required: ["dish_name_vn", "dish_name_zh"],
+          },
+        },
+      },
+      required: ["time_slot", "activity_title", "place_name", "place_zh"],
+    },
+  };
+
+  let lastError: any = null;
+  for (const modelName of CANDIDATE_MODELS) {
+    try {
+      const response = await ai.models.generateContent({
+        model: modelName,
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: schema,
+        },
+      });
+
+      if (response.text) {
+        return JSON.parse(response.text);
+      }
+    } catch (err: any) {
+      console.warn(`Suggest error with model ${modelName}:`, err.message);
+      lastError = err;
+    }
+  }
+
+  throw new Error(`Lỗi gợi ý địa điểm: ${lastError?.message || "Rate limit"}`);
 }
