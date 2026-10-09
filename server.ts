@@ -2,8 +2,6 @@ import express, { Request, Response } from "express";
 import multer from "multer";
 import mammoth from "mammoth";
 import dotenv from "dotenv";
-import fs from "fs";
-import path from "path";
 import { parseTripWithGemini, suggestActivities } from "./src/lib/gemini.js";
 import { SAMPLE_TRIPS } from "./src/data/sampleTrips.js";
 
@@ -11,31 +9,6 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// Persistent disk storage for multi-device synchronization (PC & Phone)
-const DATA_DIR = path.resolve(process.cwd(), "data");
-const TRIPS_FILE = path.join(DATA_DIR, "user_trips.json");
-
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-
-let userTripsMap: Record<string, any[]> = {};
-if (fs.existsSync(TRIPS_FILE)) {
-  try {
-    userTripsMap = JSON.parse(fs.readFileSync(TRIPS_FILE, "utf-8"));
-  } catch (e) {
-    userTripsMap = {};
-  }
-}
-
-function saveUserTripsToDisk() {
-  try {
-    fs.writeFileSync(TRIPS_FILE, JSON.stringify(userTripsMap, null, 2), "utf-8");
-  } catch (e) {
-    console.error("Failed to save user trips to disk:", e);
-  }
-}
 
 // Setup Multer for in-memory file parsing (.docx, .txt, .md)
 const upload = multer({
@@ -106,105 +79,311 @@ app.post(
   }
 );
 
-// Helper to extract Google Doc ID from URL
+// Helper to extract Google Doc ID or Drive File ID from any URL format
 function extractGoogleDocId(input: string): string | null {
-  const match = input.match(/\/document\/d\/([a-zA-Z0-9-_]+)/);
-  if (match) return match[1];
-  if (/^[a-zA-Z0-9-_]{20,}$/.test(input.trim())) return input.trim();
+  if (!input) return null;
+  const trimmed = input.trim();
+  // Published web doc /document/d/e/...
+  const pubMatch = trimmed.match(/\/document\/d\/e\/([a-zA-Z0-9_-]+)/);
+  if (pubMatch) return pubMatch[1];
+
+  // Standard Google Docs: /document/u/X/d/... or /document/d/...
+  const docMatch = trimmed.match(/\/document\/(?:u\/\d+\/)?d\/([a-zA-Z0-9_-]+)/);
+  if (docMatch) return docMatch[1];
+
+  // Google Drive file: /file/u/X/d/... or /file/d/...
+  const fileMatch = trimmed.match(/\/file\/(?:u\/\d+\/)?d\/([a-zA-Z0-9_-]+)/);
+  if (fileMatch) return fileMatch[1];
+
+  // Google Drive open link: ?id=... or &id=...
+  const idMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (idMatch) return idMatch[1];
+
+  // Generic /d/{id}
+  const genericMatch = trimmed.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+  if (genericMatch) return genericMatch[1];
+
+  // Pure doc / file ID (typically 20+ characters)
+  if (/^[a-zA-Z0-9_-]{20,}$/.test(trimmed)) return trimmed;
   return null;
 }
 
-// Helper to extract 100% of text from Google Docs JSON including tables, rows, cells, and paragraphs
-function extractAllTextFromGoogleDoc(docData: any): string {
-  if (!docData?.body?.content) return "";
-  let fullText = "";
+// Helper to convert HTML into clean structured plain text
+function cleanHtmlText(html: string): string {
+  if (!html) return "";
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, "")
+    .replace(/<\/(h[1-6]|p|div|tr|li|section|article)>/gi, "\n")
+    .replace(/<\/td>/gi, " | ")
+    .replace(/<br\s*[\/]?>/gi, "\n")
+    .replace(/<[^>]+>/gi, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n\s*\n+/g, "\n\n")
+    .trim();
+}
 
-  function walk(elements: any[]) {
+// Helper to extract 100% of text from Google Docs API JSON AST
+function extractAllTextFromGoogleDoc(docData: any): string {
+  if (!docData) return "";
+  const parts: string[] = [];
+
+  function parseElements(elements: any[]) {
+    if (!Array.isArray(elements)) return;
     for (const el of elements) {
       if (el.paragraph?.elements) {
+        let pText = "";
         for (const pe of el.paragraph.elements) {
           if (pe.textRun?.content) {
-            fullText += pe.textRun.content;
+            pText += pe.textRun.content;
           }
         }
+        if (pText.trim()) parts.push(pText.trim());
       } else if (el.table?.tableRows) {
         for (const row of el.table.tableRows) {
-          const cells: string[] = [];
+          const rowCells: string[] = [];
           for (const cell of row.tableCells || []) {
-            if (cell.content) {
-              const start = fullText.length;
-              walk(cell.content);
-              const cellText = fullText.substring(start).trim();
-              fullText = fullText.substring(0, start);
-              if (cellText) cells.push(cellText);
+            const cellParts: string[] = [];
+            for (const contentEl of cell.content || []) {
+              if (contentEl.paragraph?.elements) {
+                let cellP = "";
+                for (const pe of contentEl.paragraph.elements) {
+                  if (pe.textRun?.content) cellP += pe.textRun.content;
+                }
+                if (cellP.trim()) cellParts.push(cellP.trim());
+              }
+            }
+            if (cellParts.length > 0) {
+              rowCells.push(cellParts.join(" "));
             }
           }
-          if (cells.length > 0) {
-            fullText += cells.join(" | ") + "\n";
+          if (rowCells.length > 0) {
+            parts.push(rowCells.join(" | "));
           }
         }
       } else if (el.tableOfContents?.content) {
-        walk(el.tableOfContents.content);
+        parseElements(el.tableOfContents.content);
       }
     }
   }
 
-  walk(docData.body.content);
-  return fullText;
+  if (docData.body?.content) {
+    parseElements(docData.body.content);
+  }
+  return parts.join("\n");
 }
 
-// Fetch Google Docs text with maximum fidelity (docx export with mammoth > Docs API > txt export)
+// Fetch Google Docs / Drive file content with maximum fidelity across multiple strategies
 async function fetchGoogleDocContent(docId: string, accessToken?: string): Promise<string> {
-  // Strategy 1: Export as .docx & parse with mammoth (Captures 100% of tables, lists & columns!)
-  try {
-    const exportDocxUrl = `https://docs.google.com/document/d/${docId}/export?format=docx`;
-    const docxRes = await fetch(exportDocxUrl, {
-      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
-    });
-    if (docxRes.ok) {
-      const arrayBuffer = await docxRes.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      const mammothResult = await mammoth.extractRawText({ buffer });
-      if (mammothResult.value && mammothResult.value.trim().length > 30) {
-        return mammothResult.value;
-      }
-    }
-  } catch (err) {
-    console.warn("Google Docs docx export fallback:", err);
-  }
+  const browserHeaders: Record<string, string> = {
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    Accept:
+      "text/html,application/xhtml+xml,application/xml;q=0.9,application/vnd.openxmlformats-officedocument.wordprocessingml.document,*/*;q=0.8",
+  };
 
-  // Strategy 2: Google Docs API (if accessToken available) with recursive table/cell walker
+  // ==========================================
+  // STRATEGY A: OAuth API Access (For User's Personal Docs / Drive Files)
+  // ==========================================
   if (accessToken) {
+    // A1: Google Docs API (Structured JSON for native Google Docs)
     try {
       const apiRes = await fetch(`https://docs.googleapis.com/v1/documents/${docId}`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: "application/json",
+        },
       });
       if (apiRes.ok) {
         const docData = await apiRes.json();
         const apiText = extractAllTextFromGoogleDoc(docData);
         if (apiText && apiText.trim().length > 30) {
+          console.log(`[Google Docs API] Success: ${apiText.length} characters extracted.`);
           return apiText;
         }
       }
-    } catch (err) {
-      console.warn("Google Docs API fallback:", err);
+    } catch (err: any) {
+      console.warn("[Google Docs API Error]:", err?.message);
+    }
+
+    // A2: Google Drive API Export (For native Docs / Sheets to text)
+    try {
+      const driveExportRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${docId}/export?mimeType=text/plain`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (driveExportRes.ok) {
+        const text = await driveExportRes.text();
+        if (text && text.trim().length > 30) {
+          console.log(`[Google Drive Export] Success: ${text.length} characters.`);
+          return text;
+        }
+      }
+    } catch (err: any) {
+      console.warn("[Google Drive Export Error]:", err?.message);
+    }
+
+    // A3: Google Drive API Media Download (For .docx, .txt uploaded to Drive)
+    try {
+      const driveMediaRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${docId}?alt=media`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (driveMediaRes.ok) {
+        const arrayBuffer = await driveMediaRes.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        // Check for PK ZIP header (Word .docx)
+        if (buffer.length > 4 && buffer[0] === 0x50 && buffer[1] === 0x4b) {
+          const mammothResult = await mammoth.extractRawText({ buffer });
+          if (mammothResult.value && mammothResult.value.trim().length > 30) {
+            console.log(`[Google Drive Media .docx] Success: ${mammothResult.value.length} characters.`);
+            return mammothResult.value;
+          }
+        } else {
+          const plainText = buffer.toString("utf-8");
+          if (plainText && !plainText.includes("<!DOCTYPE html>") && plainText.trim().length > 30) {
+            return plainText;
+          }
+        }
+      }
+    } catch (err: any) {
+      console.warn("[Google Drive Media Error]:", err?.message);
     }
   }
 
-  // Strategy 3: Export as .txt
+  // ==========================================
+  // STRATEGY B: Public / Link-Shared Documents
+  // ==========================================
+
+  // B1: Google Docs mobilebasic view (Lightweight HTML view without login wall)
+  try {
+    const mobileUrl = `https://docs.google.com/document/d/${docId}/mobilebasic`;
+    const mobileRes = await fetch(mobileUrl, {
+      headers: browserHeaders,
+      redirect: "follow",
+    });
+    if (mobileRes.ok) {
+      const html = await mobileRes.text();
+      if (!html.includes('service="wise"') && !html.includes("accounts.google.com/ServiceLogin")) {
+        const cleaned = cleanHtmlText(html);
+        if (cleaned && cleaned.length > 40) {
+          console.log(`[Google Docs mobilebasic] Success: ${cleaned.length} characters.`);
+          return cleaned;
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn("[Google Docs mobilebasic Error]:", err?.message);
+  }
+
+  // B2: Export as .docx & parse with mammoth (Captures 100% of tables & columns)
+  try {
+    const exportDocxUrl = `https://docs.google.com/document/d/${docId}/export?format=docx`;
+    const docxRes = await fetch(exportDocxUrl, {
+      headers: browserHeaders,
+      redirect: "follow",
+    });
+    const contentType = docxRes.headers.get("content-type") || "";
+    if (docxRes.ok && !contentType.includes("text/html")) {
+      const arrayBuffer = await docxRes.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      if (buffer.length > 4 && buffer[0] === 0x50 && buffer[1] === 0x4b) {
+        const mammothResult = await mammoth.extractRawText({ buffer });
+        if (mammothResult.value && mammothResult.value.trim().length > 30) {
+          console.log(`[Google Docs docx export] Success: ${mammothResult.value.length} characters.`);
+          return mammothResult.value;
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn("[Google Docs docx export Error]:", err?.message);
+  }
+
+  // B3: Export as .txt
   try {
     const exportTxtUrl = `https://docs.google.com/document/d/${docId}/export?format=txt`;
     const txtRes = await fetch(exportTxtUrl, {
-      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      headers: browserHeaders,
+      redirect: "follow",
     });
-    if (txtRes.ok) {
+    const contentType = txtRes.headers.get("content-type") || "";
+    if (txtRes.ok && !contentType.includes("text/html")) {
       const txt = await txtRes.text();
       if (txt && !txt.includes("<!DOCTYPE html>") && txt.trim().length > 20) {
+        console.log(`[Google Docs txt export] Success: ${txt.length} characters.`);
         return txt;
       }
     }
+  } catch (err: any) {
+    console.warn("[Google Docs txt export Error]:", err?.message);
+  }
+
+  // B4: Export as HTML
+  try {
+    const exportHtmlUrl = `https://docs.google.com/document/d/${docId}/export?format=html`;
+    const htmlRes = await fetch(exportHtmlUrl, {
+      headers: browserHeaders,
+      redirect: "follow",
+    });
+    if (htmlRes.ok) {
+      const html = await htmlRes.text();
+      if (!html.includes("accounts.google.com/ServiceLogin")) {
+        const cleaned = cleanHtmlText(html);
+        if (cleaned && cleaned.length > 40) {
+          console.log(`[Google Docs html export] Success: ${cleaned.length} characters.`);
+          return cleaned;
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn("[Google Docs html export Error]:", err?.message);
+  }
+
+  // B5: Google Drive public download
+  try {
+    const driveDlUrl = `https://drive.google.com/uc?id=${docId}&export=download`;
+    const driveDlRes = await fetch(driveDlUrl, {
+      headers: browserHeaders,
+      redirect: "follow",
+    });
+    if (driveDlRes.ok) {
+      const arrayBuffer = await driveDlRes.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      if (buffer.length > 4 && buffer[0] === 0x50 && buffer[1] === 0x4b) {
+        const mammothResult = await mammoth.extractRawText({ buffer });
+        if (mammothResult.value && mammothResult.value.trim().length > 30) {
+          return mammothResult.value;
+        }
+      } else {
+        const text = buffer.toString("utf-8");
+        if (text && !text.includes("<!DOCTYPE html>") && text.trim().length > 30) {
+          return text;
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn("[Google Drive direct download Error]:", err?.message);
+  }
+
+  // B6: Published Web Doc (/pub)
+  try {
+    const pubUrl = `https://docs.google.com/document/d/e/${docId}/pub`;
+    const pubRes = await fetch(pubUrl, { headers: browserHeaders, redirect: "follow" });
+    if (pubRes.ok) {
+      const html = await pubRes.text();
+      const cleaned = cleanHtmlText(html);
+      if (cleaned && cleaned.length > 40) return cleaned;
+    }
   } catch (err) {
-    console.warn("Google Docs txt export fallback:", err);
+    // ignore
   }
 
   return "";
@@ -215,14 +394,15 @@ app.post("/api/fetch-google-doc", async (req: Request, res: Response) => {
   try {
     const { url, accessToken } = req.body;
     if (!url) {
-      res.status(400).json({ error: "Vui lòng cung cấp liên kết Google Docs." });
+      res.status(400).json({ error: "Vui lòng cung cấp liên kết Google Docs hoặc Google Drive." });
       return;
     }
 
     const docId = extractGoogleDocId(url);
     if (!docId) {
       res.status(400).json({
-        error: "Định dạng liên kết Google Docs không hợp lệ. Ví dụ: https://docs.google.com/document/d/.../edit",
+        error:
+          "Định dạng liên kết không hợp lệ. Hỗ trợ liên kết Google Docs (docs.google.com/document/d/...) và Google Drive (drive.google.com/file/d/...).",
       });
       return;
     }
@@ -231,7 +411,7 @@ app.post("/api/fetch-google-doc", async (req: Request, res: Response) => {
     if (!extractedText.trim()) {
       res.status(400).json({
         error:
-          "Không thể đọc tài liệu Google Docs này. Hãy đảm bảo tài liệu được bật quyền: 'Bất kỳ ai có đường liên kết đều có thể xem' (Anyone with the link can view).",
+          "Không thể đọc nội dung tài liệu. Vui lòng kiểm tra:\n1. Bật quyền chia sẻ: 'Bất kỳ ai có đường liên kết đều có thể xem' (Anyone with the link can view).\n2. Hoặc nếu là file riêng tư trong Google Drive, hãy bấm nút 'Cấp quyền Google Docs' để ứng dụng đọc trực tiếp.",
       });
       return;
     }
@@ -272,7 +452,8 @@ app.post("/api/sync-google-doc", async (req: Request, res: Response) => {
     const extractedText = await fetchGoogleDocContent(docId, accessToken);
     if (!extractedText.trim()) {
       res.status(400).json({
-        error: "Không thể kết nối đến Google Docs. Vui lòng kiểm tra quyền chia sẻ liên kết.",
+        error:
+          "Không thể đồng bộ nội dung từ Google Docs/Drive. Vui lòng kiểm tra quyền chia sẻ liên kết (Bất kỳ ai có liên kết đều có thể xem) hoặc cấp quyền Google Workspace trong tài khoản.",
       });
       return;
     }
@@ -336,51 +517,7 @@ app.post("/api/suggest-activities", async (req: Request, res: Response) => {
   }
 });
 
-// API: Synchronized User Trips (Works seamlessly between PC & Phone)
-app.get("/api/user-trips/:uid", (req: Request, res: Response) => {
-  const { uid } = req.params;
-  if (!userTripsMap[uid] || userTripsMap[uid].length === 0) {
-    userTripsMap[uid] = [...SAMPLE_TRIPS];
-    saveUserTripsToDisk();
-  }
-  res.json({ success: true, data: userTripsMap[uid] });
-});
-
-app.post("/api/user-trips/:uid", (req: Request, res: Response) => {
-  const { uid } = req.params;
-  const trip = req.body;
-  if (!trip || !trip.trip_title) {
-    res.status(400).json({ error: "Lịch trình không hợp lệ." });
-    return;
-  }
-  const tripId = trip.id || `trip_${Date.now()}`;
-  const preparedTrip = { ...trip, id: tripId };
-
-  if (!userTripsMap[uid]) {
-    userTripsMap[uid] = [...SAMPLE_TRIPS];
-  }
-
-  const existingIdx = userTripsMap[uid].findIndex((t) => t.id === tripId);
-  if (existingIdx >= 0) {
-    userTripsMap[uid][existingIdx] = preparedTrip;
-  } else {
-    userTripsMap[uid].unshift(preparedTrip);
-  }
-
-  saveUserTripsToDisk();
-  res.json({ success: true, data: userTripsMap[uid] });
-});
-
-app.delete("/api/user-trips/:uid/:tripId", (req: Request, res: Response) => {
-  const { uid, tripId } = req.params;
-  if (userTripsMap[uid]) {
-    userTripsMap[uid] = userTripsMap[uid].filter((t) => t.id !== tripId);
-    saveUserTripsToDisk();
-  }
-  res.json({ success: true, data: userTripsMap[uid] || [] });
-});
-
-// API: CRUD Trips (Legacy/fallback)
+// API: CRUD Trips
 app.get("/api/trips", (_req: Request, res: Response) => {
   res.json({ success: true, data: serverTrips });
 });

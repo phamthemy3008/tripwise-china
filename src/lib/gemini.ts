@@ -110,11 +110,18 @@ ${rawText}`;
         config: {
           responseMimeType: "application/json",
           responseSchema: schema,
+          maxOutputTokens: 16384,
         },
       });
 
       if (response.text) {
-        const parsedData = JSON.parse(response.text);
+        let cleanText = response.text.trim();
+        if (cleanText.startsWith("```json")) {
+          cleanText = cleanText.replace(/^```json\s*/, "").replace(/\s*```$/, "");
+        } else if (cleanText.startsWith("```")) {
+          cleanText = cleanText.replace(/^```\s*/, "").replace(/\s*```$/, "");
+        }
+        const parsedData = JSON.parse(cleanText);
         return {
           ...parsedData,
           id: `trip_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,

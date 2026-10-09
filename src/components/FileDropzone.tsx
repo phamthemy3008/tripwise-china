@@ -9,9 +9,12 @@ import {
   Link2,
   RefreshCw,
   ExternalLink,
+  ShieldCheck,
+  KeyRound,
 } from "lucide-react";
 import { TripDocument } from "../types/itinerary";
 import { toast } from "sonner";
+import { useAuth } from "../context/AuthContext";
 
 interface FileDropzoneProps {
   onParsedSuccess: (trip: TripDocument) => void;
@@ -22,12 +25,13 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
   onParsedSuccess,
   onSelectSample,
 }) => {
+  const { user, googleAccessToken, requestGoogleWorkspaceAccess } = useAuth();
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [textInput, setTextInput] = useState("");
   const [gdocUrl, setGdocUrl] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState<"file" | "text" | "gdoc">("file");
+  const [activeTab, setActiveTab] = useState<"gdoc" | "file" | "text">("gdoc");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDrag = (e: React.DragEvent) => {
@@ -75,14 +79,14 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
       return;
     }
     if (activeTab === "gdoc" && !gdocUrl.trim()) {
-      toast.warning("Vui lòng dán liên kết tài liệu Google Docs");
+      toast.warning("Vui lòng dán liên kết tài liệu Google Docs hoặc Google Drive");
       return;
     }
 
     setIsProcessing(true);
     const toastId = toast.loading(
       activeTab === "gdoc"
-        ? "Đang đọc tài liệu Google Docs & AI phân tích..."
+        ? "Đang đọc tài liệu Google Docs / Drive & AI phân tích..."
         : "Gemini AI đang trích xuất dữ liệu lịch trình..."
     );
 
@@ -91,12 +95,15 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
         const response = await fetch("/api/fetch-google-doc", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: gdocUrl }),
+          body: JSON.stringify({
+            url: gdocUrl.trim(),
+            accessToken: googleAccessToken || undefined,
+          }),
         });
 
         const resJson = await response.json();
         if (!response.ok || !resJson.success) {
-          throw new Error(resJson.error || "Không thể đọc Google Docs");
+          throw new Error(resJson.error || "Không thể đọc nội dung Google Docs");
         }
 
         toast.success("Trích xuất Google Docs thành công!", { id: toastId });
@@ -155,7 +162,7 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
           Nhập Lịch Trình Du Lịch
         </h2>
         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2">
-          Hỗ trợ đọc từ Google Docs (tự động đồng bộ khi sửa), tải file Word (.docx), hoặc dán văn bản trực tiếp.
+          Hỗ trợ đọc từ Google Docs (tự động đồng bộ khi sửa), Google Drive, tải file Word (.docx), hoặc dán văn bản trực tiếp.
         </p>
       </div>
 
@@ -208,7 +215,7 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
                 <Link2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                Dán đường dẫn liên kết Google Docs của bạn:
+                Dán đường dẫn liên kết Google Docs hoặc Google Drive của bạn:
               </span>
               <button
                 type="button"
@@ -223,15 +230,42 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
               type="url"
               value={gdocUrl}
               onChange={(e) => setGdocUrl(e.target.value)}
-              placeholder="https://docs.google.com/document/d/.../edit"
+              placeholder="https://docs.google.com/document/d/... hoặc https://drive.google.com/file/d/..."
               className="w-full rounded-xl border border-blue-300 dark:border-blue-800 bg-white dark:bg-slate-900 p-3 text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
             />
+
+            {/* Google Account OAuth Status Banner */}
+            <div className="mt-3">
+              {googleAccessToken ? (
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-medium">
+                  <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <span>
+                    Đã cấp quyền Google Workspace cho tài khoản: <strong>{user?.email || "Cá nhân"}</strong>. Có thể đọc cả file riêng tư và file chia sẻ!
+                  </span>
+                </div>
+              ) : (
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-blue-100/60 dark:bg-blue-900/30 border border-blue-300/60 dark:border-blue-800 text-blue-900 dark:text-blue-200 text-xs">
+                  <div className="flex items-center gap-2">
+                    <KeyRound className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                    <span>Đang ở tài khoản: <strong>{user?.email || "Người dùng"}</strong></span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => requestGoogleWorkspaceAccess()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition-colors shrink-0 cursor-pointer shadow-xs"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>Cấp quyền đọc Google Docs cá nhân</span>
+                  </button>
+                </div>
+              )}
+            </div>
 
             <div className="mt-3 text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed space-y-1">
               <p className="flex items-start gap-1.5">
                 <span className="text-blue-600 font-bold shrink-0">&bull;</span>
                 <span>
-                  <strong>Lưu ý quyền xem:</strong> Trên Google Docs, bấm <strong>Chia sẻ (Share)</strong> -&gt; chọn <strong>Bất kỳ ai có đường liên kết đều có thể xem (Anyone with the link can view)</strong>.
+                  <strong>Đối với tài liệu chia sẻ:</strong> Bạn chỉ cần bấm <strong>Chia sẻ (Share)</strong> trên Google Docs -&gt; chọn <strong>Bất kỳ ai có đường liên kết đều có thể xem (Anyone with the link can view)</strong>.
                 </span>
               </p>
               <p className="flex items-start gap-1.5">

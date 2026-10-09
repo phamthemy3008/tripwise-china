@@ -42,7 +42,7 @@ import {
 } from "lucide-react";
 
 function MainApp() {
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading, signOut, googleAccessToken } = useAuth();
   const [trips, setTrips] = useState<TripDocument[]>([]);
   const [currentTripId, setCurrentTripId] = useState<string>("");
   const [selectedDayNumber, setSelectedDayNumber] = useState<number>(1);
@@ -250,6 +250,7 @@ function MainApp() {
           docUrl: currentTrip.source_doc_url,
           tripId: currentTrip.id,
           existingTrip: currentTrip,
+          accessToken: googleAccessToken || undefined,
         }),
       });
       const resJson = await response.json();
