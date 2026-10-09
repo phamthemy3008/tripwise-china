@@ -318,6 +318,16 @@ export const SAMPLE_TRIPS: TripDocument[] = [
             place_zh: "武隆南站",
             amap_query: "武隆南站",
             transport_hint: "Tàu cao tốc Gaotie G2448 (1h 41m); Taxi lên Tiên Nữ Sơn",
+            transport_detail: {
+              mode: "train",
+              train_number: "G2448",
+              train_departure_station_vn: "Ga Trương Gia Giới Tây",
+              train_departure_station_zh: "张家界西站",
+              train_arrival_station_vn: "Ga Vũ Long Nam",
+              train_arrival_station_zh: "武隆南站",
+              train_duration: "1h 41m",
+              summary: "Tàu cao tốc G2448 (09:01 - 10:42) từ Trương Gia Giới Tây sang Vũ Long Nam",
+            },
             duration_hint: "4 tiếng"
           },
           {
@@ -329,7 +339,7 @@ export const SAMPLE_TRIPS: TripDocument[] = [
             place_zh: "天生三桥",
             amap_query: "天生三桥游客中心",
             transport_hint: "Xe buýt nội khu & Thang máy kính tụt xuống đáy vực",
-            ticket_hint: "Vé tham quan Thiên Sinh Tam Kiều ~125 RMB",
+            ticket_hint: "Vé tham quan Thiên Sinh Tam Kiều ~125 RMB (Đặt qua WeChat / Trip.com)",
             duration_hint: "4 tiếng"
           },
           {
@@ -340,7 +350,7 @@ export const SAMPLE_TRIPS: TripDocument[] = [
             place_name: "Show diễn Ấn tượng Vũ Long",
             place_zh: "印象武隆",
             amap_query: "印象武隆剧场",
-            ticket_hint: "Vé xem show Ấn Tượng Vũ Long ~200 RMB",
+            ticket_hint: "Vé xem show Ấn Tượng Vũ Long ~200 RMB (Đặt qua WeChat / Trip.com)",
             tips: "Show diễn ban đêm ngoài hẻm núi rất lạnh (dưới 8 độ C), nhớ mặc áo khoác dày ấm.",
             dishes: [
               {
@@ -443,7 +453,17 @@ export const SAMPLE_TRIPS: TripDocument[] = [
             place_name: "Phố cổ Từ Khí Khẩu (Ciqikou)",
             place_zh: "磁器口古镇",
             amap_query: "磁器口古镇",
-            transport_hint: "Metro Line 1 ga Ciqikou",
+            transport_hint: "Metro Line 1 ga Ciqikou (磁器口站)",
+            transport_detail: {
+              mode: "metro",
+              metro_line: "Line 1 (Tuyến số 1)",
+              departure_station_vn: "Ga Tiểu Thập Tự (Xiaoshizi)",
+              departure_station_zh: "小什字站",
+              arrival_station_vn: "Ga Từ Khí Khẩu (Ciqikou)",
+              arrival_station_zh: "磁器口站",
+              station_count: "14 ga (~28 phút)",
+              summary: "Đón Metro Line 1 từ ga Tiểu Thập Tự đến ga Ciqikou",
+            },
             duration_hint: "3.5 tiếng",
             dishes: [
               {
@@ -661,6 +681,16 @@ export const SAMPLE_TRIPS: TripDocument[] = [
             place_zh: "成都东站",
             amap_query: "成都春熙路美居酒店",
             transport_hint: "Tàu cao tốc G8608 (1h 04m); Metro Line 2 về Tianfu Square",
+            transport_detail: {
+              mode: "train",
+              train_number: "G8608",
+              train_departure_station_vn: "Ga Trùng Khánh Bắc",
+              train_departure_station_zh: "重庆北站",
+              train_arrival_station_vn: "Ga Thành Đô Đông",
+              train_arrival_station_zh: "成都东站",
+              train_duration: "1h 04m",
+              summary: "Tàu cao tốc G8608 (09:13 - 10:17) từ Trùng Khánh Bắc sang Thành Đô Đông",
+            },
             duration_hint: "3.5 tiếng",
             dishes: [
               {
@@ -679,7 +709,18 @@ export const SAMPLE_TRIPS: TripDocument[] = [
             place_name: "Tu viện Văn Thù (Wenshu Monastery)",
             place_zh: "成都文殊院",
             amap_query: "文殊院",
-            transport_hint: "Metro Line 1 ga Wenshu Monastery",
+            transport_hint: "Metro Line 1 ga Wenshu Monastery (文殊院站)",
+            transport_detail: {
+              mode: "metro",
+              metro_line: "Line 1 (Tuyến số 1)",
+              departure_station_vn: "Ga Quảng trường Thiên Phủ (Tianfu Square)",
+              departure_station_zh: "天府广场站",
+              arrival_station_vn: "Ga Tu viện Văn Thù (Wenshu Monastery)",
+              arrival_station_zh: "文殊院站",
+              station_count: "2 ga (~6 phút)",
+              summary: "Đón Metro Line 1 hướng Viêm Bắc ra ga Wenshu Monastery",
+            },
+            ticket_hint: "Miễn phí vé vào cửa Tu viện Văn Thù (Quét mã WeChat tại cổng)",
             duration_hint: "3.5 tiếng"
           },
           {

@@ -1,13 +1,13 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express, { Request, Response } from "express";
 import multer from "multer";
 import mammoth from "mammoth";
-import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import { parseTripWithGemini, suggestActivities, suggestRestaurants } from "./src/lib/gemini.js";
 import { SAMPLE_TRIPS } from "./src/data/sampleTrips.js";
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -604,7 +604,7 @@ app.post("/api/suggest-activities", async (req: Request, res: Response) => {
 // API: Suggest restaurants for dish / place / city
 app.post("/api/suggest-restaurants", async (req: Request, res: Response) => {
   try {
-    const { dishName, dishZh, city, placeName } = req.body;
+    const { dishName, dishZh, city, placeName, placeZh } = req.body;
     if (!city && !dishName && !placeName) {
       res.status(400).json({ error: "Thiếu thông tin thành phố hoặc món ăn." });
       return;
@@ -614,6 +614,7 @@ app.post("/api/suggest-restaurants", async (req: Request, res: Response) => {
       dishZh,
       city: city || "Trung Quốc",
       placeName,
+      placeZh,
     });
     res.json({ success: true, data: restaurants });
   } catch (error: any) {

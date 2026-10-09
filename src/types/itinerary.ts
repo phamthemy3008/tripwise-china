@@ -23,6 +23,37 @@ export interface DishItem {
   restaurant_note?: string;
 }
 
+export interface TransportDetail {
+  mode?: "metro" | "taxi" | "train" | "flight" | "cableway" | "walk" | "bus" | "other";
+  // Metro details
+  metro_line?: string;
+  departure_station_vn?: string;
+  departure_station_zh?: string;
+  arrival_station_vn?: string;
+  arrival_station_zh?: string;
+  station_count?: string;
+  
+  // High-Speed Train (12306 / Gaotie) details
+  train_number?: string;
+  train_departure_station_vn?: string;
+  train_departure_station_zh?: string;
+  train_arrival_station_vn?: string;
+  train_arrival_station_zh?: string;
+  train_duration?: string;
+  seat_type_hint?: string;
+
+  // Taxi / DiDi details
+  pickup_name_vn?: string;
+  pickup_name_zh?: string;
+  dropoff_name_vn?: string;
+  dropoff_name_zh?: string;
+  estimated_duration?: string;
+  estimated_fare?: string;
+  
+  summary?: string;
+  notes?: string;
+}
+
 export interface ActivityEvent {
   time_slot: "Sáng" | "Chiều" | "Tối" | string;
   time_range?: string;
@@ -34,6 +65,7 @@ export interface ActivityEvent {
   dishes?: DishItem[];
   tips?: string;
   transport_hint?: string;
+  transport_detail?: TransportDetail;
   ticket_hint?: string;
   duration_hint?: string;
 }

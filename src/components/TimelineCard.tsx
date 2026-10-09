@@ -1,8 +1,10 @@
 import React, { useState } from "react";
-import { ActivityEvent } from "../types/itinerary";
-import { CopyChip } from "./CopyChip";
-import { AmapButton } from "./AmapButton";
-import { DishExplorer } from "./DishExplorer";
+import { ActivityEvent, HotelInfo } from "../types/itinerary.js";
+import { CopyChip } from "./CopyChip.js";
+import { AmapButton } from "./AmapButton.js";
+import { DishExplorer } from "./DishExplorer.js";
+import { TransportGuide } from "./TransportGuide.js";
+import { TicketGuide } from "./TicketGuide.js";
 import {
   Info,
   Sun,
@@ -10,8 +12,6 @@ import {
   Moon,
   MapPin,
   Clock,
-  Train,
-  Ticket,
   CheckCircle2,
   Circle,
 } from "lucide-react";
@@ -20,9 +20,17 @@ interface TimelineCardProps {
   event: ActivityEvent;
   index: number;
   cityName?: string;
+  hotel?: HotelInfo;
+  previousEvent?: ActivityEvent;
 }
 
-export const TimelineCard: React.FC<TimelineCardProps> = ({ event, index, cityName }) => {
+export const TimelineCard: React.FC<TimelineCardProps> = ({
+  event,
+  index,
+  cityName,
+  hotel,
+  previousEvent,
+}) => {
   const [isCheckedIn, setIsCheckedIn] = useState<boolean>(false);
 
   const getSlotIcon = (slot: string) => {
@@ -152,33 +160,19 @@ export const TimelineCard: React.FC<TimelineCardProps> = ({ event, index, cityNa
           </div>
         </div>
 
-        {/* Transport & Ticket Highlights */}
-        {(event.transport_hint || event.ticket_hint) && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-            {event.transport_hint && (
-              <div className="flex items-start gap-2 p-2.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-900/40 text-blue-900 dark:text-blue-300">
-                <Train className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-bold block text-[10px] uppercase tracking-wider text-blue-600 dark:text-blue-400">
-                    Di chuyển / Metro
-                  </span>
-                  <span>{event.transport_hint}</span>
-                </div>
-              </div>
-            )}
+        {/* Transport Guide (Metro/MetroMan, Taxi/DiDi/Alipay, Gaotie 12306) */}
+        {event.transport_hint && (
+          <TransportGuide
+            event={event}
+            hotel={hotel}
+            cityName={cityName}
+            previousEvent={previousEvent}
+          />
+        )}
 
-            {event.ticket_hint && (
-              <div className="flex items-start gap-2 p-2.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-900/40 text-emerald-900 dark:text-emerald-300">
-                <Ticket className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-bold block text-[10px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                    Vé / Đặt trước
-                  </span>
-                  <span>{event.ticket_hint}</span>
-                </div>
-              </div>
-            )}
-          </div>
+        {/* Ticket & Booking Guide (WeChat Mini-App, Trip.com) */}
+        {event.ticket_hint && (
+          <TicketGuide event={event} cityName={cityName} />
         )}
 
         {/* Detailed Description */}

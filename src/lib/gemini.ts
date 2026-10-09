@@ -1,16 +1,18 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { TripDocument, DayPlan, ActivityEvent } from "../types/itinerary.js";
 
-// Initialize Gemini API
-const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || "";
-const ai = new GoogleGenAI({
-  apiKey,
-  httpOptions: {
-    headers: {
-      "User-Agent": "aistudio-build",
+// Initialize Gemini API client lazily to ensure environment variables are loaded
+function getAi(): GoogleGenAI {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || "";
+  return new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      headers: {
+        "User-Agent": "aistudio-build",
+      },
     },
-  },
-});
+  });
+}
 
 // List of fallback models in order of rate-limit friendliness
 const CANDIDATE_MODELS = [
@@ -406,7 +408,7 @@ ${dayChunkText}`;
 
   for (const modelName of CANDIDATE_MODELS) {
     try {
-      const response = await ai.models.generateContent({
+      const response = await getAi().models.generateContent({
         model: modelName,
         contents: prompt,
         config: {
@@ -428,6 +430,10 @@ ${dayChunkText}`;
         return parsed;
       }
     } catch (err: any) {
+      if (err?.message?.includes("UNAUTHENTICATED") || err?.message?.includes("401")) {
+        console.info(`[Chunk Scanner] Gemini authentication required, falling back to heuristic parsing for Day ${dayNumber}`);
+        break;
+      }
       console.warn(`[Chunk Scanner] Model ${modelName} failed for Day ${dayNumber}: ${err.message}`);
     }
   }
@@ -565,7 +571,7 @@ Hãy gợi ý từ 3 đến 5 hoạt động / địa điểm du lịch THẬT S
 
   for (const modelName of CANDIDATE_MODELS) {
     try {
-      const response = await ai.models.generateContent({
+      const response = await getAi().models.generateContent({
         model: modelName,
         contents: prompt,
         config: {
@@ -578,6 +584,9 @@ Hãy gợi ý từ 3 đến 5 hoạt động / địa điểm du lịch THẬT S
         return JSON.parse(response.text);
       }
     } catch (err: any) {
+      if (err?.message?.includes("UNAUTHENTICATED") || err?.message?.includes("401")) {
+        break;
+      }
       console.warn(`Suggest error with model ${modelName}:`, err.message);
     }
   }
@@ -625,17 +634,25 @@ export async function suggestRestaurants(params: {
   dishZh?: string;
   city: string;
   placeName?: string;
+  placeZh?: string;
 }): Promise<RestaurantSuggestionResult[]> {
-  const prompt = `Bạn là chuyên gia ẩm thực bản địa hàng đầu tại Trung Quốc.
-Hãy gợi ý từ 2 đến 3 quán ăn / nhà hàng ĐẶC SẢN NỔI TIẾNG, uy tín và được đánh giá cao (trên Dianping/Meituan) tại thành phố "${params.city}".
-${params.dishName ? `Món ăn cần tìm quán: "${params.dishName}" (${params.dishZh || ""}).` : ""}
-${params.placeName ? `Địa điểm du lịch lân cận: "${params.placeName}".` : ""}
+  const placeContext = params.placeName
+    ? `tại khu vực lân cận "${params.placeName}" (${params.placeZh || ""}), thành phố ${params.city}`
+    : `tại thành phố "${params.city}"`;
 
-Yêu cầu cực kỳ quan trọng:
+  const prompt = `Bạn là chuyên gia ẩm thực bản địa hàng đầu tại Trung Quốc.
+Nhiệm vụ: Gợi ý từ 2 đến 3 quán ăn / nhà hàng ĐẶC SẢN NỔI TIẾNG, uy tín và được đánh giá cao (trên Dianping/Meituan) ${placeContext}.
+
+QUY TẮC CỐT LÕI - VỊ TRÍ GẦN ĐIỂM THAM QUAN HIỆN TẠI:
+${params.placeName ? `- VỊ TRÍ HIỆN TẠI CỦA LỊCH TRÌNH: "${params.placeName}" (${params.placeZh || ""}).
+- QUÁN ĂN BẮT BUỘC PHẢI NẰM NGAY GẦN ĐIỂM NÀY (Bán kính đi bộ dưới 5-10 phút hoặc cùng khu phố/phố đi bộ) để du khách tham quan xong là có thể ghé vào ăn ngay, không phải di chuyển xa!` : ""}
+${params.dishName ? `- Món ăn du khách cần tìm quán thưởng thức: "${params.dishName}" (${params.dishZh || ""}).` : ""}
+
+Yêu cầu chi tiết:
 1. Tên quán ăn phải có cả tiếng Việt (name_vn) và chữ Hán chuẩn xác (name_zh) để du khách tra cứu bản đồ Gaode Amap hoặc đưa cho tài xế taxi.
 2. Từ khóa tra cứu Amap (amap_query) chuẩn xác.
-3. Địa chỉ hoặc khu vực quán ăn (address_hint).
-4. Khoảng giá ước tính (price_range, ví dụ: "~50 - 80 ¥/người").
+3. Địa chỉ hoặc khu vực quán ăn (address_hint), nêu rõ khoảng cách hoặc vị trí so với điểm tham quan "${params.placeName || ""}" (ví dụ: "Cách cổng vào 200m", "Nằm ngay phố ẩm thực bên cạnh").
+4. Khoảng giá ước tính (price_range, ví dụ: "~45 - 80 ¥/người").
 5. Đánh giá tham khảo (rating, ví dụ: "4.8★ trên Dianping").
 6. Món ngon nổi bật nên gọi (recommended_dish).
 7. Mẹo thực tế (specialty_note: quán lâu năm, giờ mở cửa, cách đặt bàn hoặc tránh xếp hàng).`;
@@ -647,7 +664,7 @@ Yêu cầu cực kỳ quan trọng:
       properties: {
         name_vn: { type: Type.STRING, description: "Tên quán ăn / nhà hàng tiếng Việt" },
         name_zh: { type: Type.STRING, description: "Tên quán ăn chữ Hán giản thể chuẩn" },
-        address_hint: { type: Type.STRING, description: "Địa chỉ cụ thể hoặc khu phố" },
+        address_hint: { type: Type.STRING, description: "Địa chỉ cụ thể và khoảng cách gần điểm tham quan" },
         amap_query: { type: Type.STRING, description: "Từ khóa định vị trên Gaode Amap" },
         price_range: { type: Type.STRING, description: "Mức giá ví dụ: ~45 - 80 ¥/người" },
         rating: { type: Type.STRING, description: "Điểm đánh giá Dianping ví dụ 4.7★" },
@@ -660,7 +677,7 @@ Yêu cầu cực kỳ quan trọng:
 
   for (const modelName of CANDIDATE_MODELS) {
     try {
-      const response = await ai.models.generateContent({
+      const response = await getAi().models.generateContent({
         model: modelName,
         contents: prompt,
         config: {
@@ -676,135 +693,287 @@ Yêu cầu cực kỳ quan trọng:
         }
       }
     } catch (err: any) {
+      if (err?.message?.includes("UNAUTHENTICATED") || err?.message?.includes("401")) {
+        // Fall back directly to curated authentic restaurants near this place
+        break;
+      }
       console.warn(`Suggest restaurants error with model ${modelName}:`, err.message);
     }
   }
 
-  // Authentic fallback curated eateries for popular destinations
+  // --- LOCATION-AWARE CURATED FALLBACK NEAR CURRENT ITINERARY PLACE ---
+  const placeKey = `${params.placeName || ""} ${params.placeZh || ""}`.toLowerCase();
   const cityKey = (params.city || "").toLowerCase();
-  const dishKey = ((params.dishName || "") + " " + (params.dishZh || "")).toLowerCase();
 
-  if (cityKey.includes("trương gia giới") || cityKey.includes("zhangjiajie")) {
+  // 1. Gần Phố cổ Từ Khí Khẩu (Ciqikou)
+  if (placeKey.includes("từ khí khẩu") || placeKey.includes("ciqikou") || placeKey.includes("磁器口")) {
     return [
       {
-        name_vn: "Hồ Sư Phụ Tam Hạ Oa (Chi nhánh Phố Cổ Đại Dung)",
-        name_zh: "胡师傅三下锅 (大庸桥店)",
-        address_hint: "Số 117 đường Tử Ngọ, quận Vũ Lăng Nguyên / Vĩnh Định",
-        amap_query: "胡师傅三下锅",
-        price_range: "~55 - 80 ¥/người",
-        rating: "4.8★ (Top 1 Tam Hạ Oa)",
-        recommended_dish: "Lẩu xào khô Tam Hạ Oa (ruột non, thịt xông khói, đậu phụ)",
-        specialty_note: "Quán lâu năm đông khách bản địa, nên ghé trước 18:00 để không phải lấy số chờ.",
+        name_vn: "Mậu Trang Cổ Trấn Đệ Nhất Quán (Từ Khí Khẩu)",
+        name_zh: "茂庄古镇第一家毛血旺 (总店)",
+        address_hint: "Số 74 đường Chính Phố Cổ Từ Khí Khẩu (Đi bộ 2 phút từ cổng chính)",
+        amap_query: "茂庄古镇第一家毛血旺 磁器口",
+        price_range: "~45 - 75 ¥/người",
+        rating: "4.8★ (Đệ nhất Mao Huyết Vượng Từ Khí Khẩu)",
+        recommended_dish: "Mao Huyết Vượng truyền thống & Bò xào cay",
+        specialty_note: "Quán nằm ngay trục đường chính phố cổ Từ Khí Khẩu, hương vị tê cay đậm đà gia truyền.",
       },
       {
-        name_vn: "Ngân Mãn Đẩu Thổ Thái Quán",
-        name_zh: "银满斗土菜馆",
-        address_hint: "Hẻm Thương Nghiệp, quận Vĩnh Định, Trương Gia Giới",
-        amap_query: "银满斗土菜馆",
-        price_range: "~45 - 70 ¥/người",
-        rating: "4.7★ (Đặc sản Tương Tây)",
-        recommended_dish: "Vịt hầm hạt dẻ rừng & Cá suối chua ngọt người Miêu",
-        specialty_note: "Quán gia đình ấm cúng chuẩn vị vùng núi Tương Tây, phục vụ nhanh nhẹn.",
+        name_vn: "Quẩy Thừng Mè Giòn Trần Ma Hoa (Cơ Sở Gốc Từ Khí Khẩu)",
+        name_zh: "陈昌银麻花 (磁器口正街店)",
+        address_hint: "Số 47 phố cổ Từ Khí Khẩu, quận Sa Bình Bá",
+        amap_query: "陈昌银麻花 磁器口",
+        price_range: "~15 - 35 ¥/túi",
+        rating: "4.7★ (Đặc sản ăn vặt mua làm quà số 1)",
+        recommended_dish: "Quẩy xoắn vị mè đen giòn tan & Vị rong biển cay",
+        specialty_note: "Quán chính gốc luôn đông người xếp hàng thử bánh nóng giòn vừa ra lò.",
       },
     ];
   }
 
-  if (cityKey.includes("phượng hoàng") || cityKey.includes("fenghuang")) {
+  // 2. Gần Giải Phóng Bối / Phố Bát Nhất / Hồng Nhai Động (Jiefangbei / Hongyadong)
+  if (
+    placeKey.includes("giải phóng bối") ||
+    placeKey.includes("jiefangbei") ||
+    placeKey.includes("bát nhất") ||
+    placeKey.includes("hồng nhai động") ||
+    placeKey.includes("hongyadong") ||
+    placeKey.includes("解放碑") ||
+    placeKey.includes("八一路")
+  ) {
+    return [
+      {
+        name_vn: "Miến Chua Cay Hảo Hữu Lai (Phố Bát Nhất)",
+        name_zh: "好又来酸辣粉 (八一路好吃街)",
+        address_hint: "Số 28 phố ẩm thực Bát Nhất, Giải Phóng Bi (Đi bộ 3 phút từ tháp đồng hồ)",
+        amap_query: "好又来酸辣粉 八一路",
+        price_range: "~15 - 25 ¥/người",
+        rating: "4.8★ (Huyền thoại miến chua cay Trùng Khánh)",
+        recommended_dish: "Miến chua cay sốt thịt bằm & Bánh nếp đường đen",
+        specialty_note: "Nằm ngay giữa phố ăn vặt Bát Nhất, phục vụ nhanh, ăn tại chỗ hoặc vừa đi vừa thưởng thức.",
+      },
+      {
+        name_vn: "Lẩu Cửu Cung Cách Chu Sư Huynh (Cơ sở Giải Phóng Bối)",
+        name_zh: "周师兄重庆火锅 (解放碑店)",
+        address_hint: "Số 139 đường Dân Sinh, ngay sát phố đi bộ Giải Phóng Bối",
+        amap_query: "周师兄火锅 解放碑",
+        price_range: "~85 - 120 ¥/người",
+        rating: "4.9★ (Di sản ẩm thực phi vật thể)",
+        recommended_dish: "Nồi lẩu 9 ô mỡ bò & Dạ sách giòn xé tay",
+        specialty_note: "Chỉ cách tháp Giải Phóng Bối 250m, có phục vụ nước trà thảo mộc giải ngấy cay.",
+      },
+    ];
+  }
+
+  // 3. Gần Tu viện Văn Thù (Wenshu Monastery) - Thành Đô
+  if (placeKey.includes("văn thù") || placeKey.includes("wenshu") || placeKey.includes("文殊院")) {
+    return [
+      {
+        name_vn: "Tiệm Mì Ngọt & Thạch Đậu Trương Lão Nhị (Cửa Chùa Văn Thù)",
+        name_zh: "洞子口张老二凉粉 (文殊院店)",
+        address_hint: "Số 39 phố Văn Thù Viện (Đối diện thẳng cổng chính Tu viện Văn Thù)",
+        amap_query: "张老二凉粉 文殊院",
+        price_range: "~15 - 28 ¥/người",
+        rating: "4.8★ (Top 1 Mì Điềm Thủy Diện Thành Đô)",
+        recommended_dish: "Mì ngọt sốt ớt Điềm Thủy Diện (甜水面) & Thạch đậu nguội",
+        specialty_note: "Bước ra khỏi cổng chùa Văn Thù là thấy ngay, sợi mì dày béo ngậy ngọt cay đặc trưng.",
+      },
+      {
+        name_vn: "Bánh Ngọt Cổ Truyền Cung Đình Cao Điểm (Văn Thù Viện)",
+        name_zh: "闻酥园宫廷糕点 (文殊院总店)",
+        address_hint: "Đầu ngõ phố cổ Văn Thù, đường Nhân Dân Trung, Thành Đô",
+        amap_query: "闻酥园 文殊院",
+        price_range: "~20 - 40 ¥/người",
+        rating: "4.7★ (Bánh ngọt truyền thống nổi tiếng)",
+        recommended_dish: "Bánh đào giòn & Bánh hạt sen nhân đậu đỏ",
+        specialty_note: "Quán bánh cổ truyền người dân Thành Đô xếp hàng dài mỗi sáng, giá cực kỳ bình dân.",
+      },
+    ];
+  }
+
+  // 4. Gần Phố Xuân Hy / IFS / Thái Cổ Lý (Chunxi Road / Taikoo Li)
+  if (placeKey.includes("xuân hy") || placeKey.includes("chunxi") || placeKey.includes("ifs") || placeKey.includes("thái cổ lý") || placeKey.includes("春熙路")) {
+    return [
+      {
+        name_vn: "Nhà Hàng Mã Vượng Tử Xuyên Tiểu Quán (Michelin Bib Gourmand)",
+        name_zh: "马旺子·川小馆 (太古里店)",
+        address_hint: "Khu Đông Thái Cổ Li, cách khối nhà IFS Gấu Trúc trèo tường 300m",
+        amap_query: "马旺子 太古里",
+        price_range: "~80 - 130 ¥/người",
+        rating: "4.9★ (Ẩm thực Tứ Xuyên danh tiếng từ 1923)",
+        recommended_dish: "Tiết om huyết vượng sốt ớt & Vịt quay da giòn thảo mộc",
+        specialty_note: "Nằm ngay khu Thái Cổ Lý, nên lấy số điện tử trên app Dianping trước khi đến để tránh xếp hàng lâu.",
+      },
+      {
+        name_vn: "Sủi Cảo Bát Nhỏ Long Xảo Thủ (Phố Đi Bộ Xuân Hy)",
+        name_zh: "龙抄手 (春熙路总店)",
+        address_hint: "Số 61 đường Thành Thủ, phố đi bộ Xuân Hy, Thành Đô",
+        amap_query: "龙抄手 春熙路总店",
+        price_range: "~30 - 55 ¥/người",
+        rating: "4.6★ (Món ăn vặt truyền thống Tứ Xuyên)",
+        recommended_dish: "Hoành thánh xảo thủ sốt ớt đỏ & Mì Đan Đan",
+        specialty_note: "Ngay trung tâm phố đi bộ Xuân Hy, không gian rộng rãi 3 tầng.",
+      },
+    ];
+  }
+
+  // 5. Gần Ngõ Rộng Ngõ Hẹp (Kuanzhai Xiangzi)
+  if (placeKey.includes("ngõ rộng") || placeKey.includes("kuanzhai") || placeKey.includes("宽窄巷子")) {
+    return [
+      {
+        name_vn: "Nhà Hàng Tiểu Điểm Tứ Xuyên Cổ Trấn (Ngõ Hẹp)",
+        name_zh: "窄巷子川菜小馆",
+        address_hint: "Số 22 ngõ Hẹp (Zhai Xiangzi), quận Thanh Dương, Thành Đô",
+        amap_query: "宽窄巷子 美食",
+        price_range: "~50 - 85 ¥/người",
+        rating: "4.7★ (Đậm đà hương vị ngõ cổ)",
+        recommended_dish: "Gà xé sốt tương cay Quái Vị & Đậu hũ Ma Bà",
+        specialty_note: "Không gian sân viện Tứ Xuyên cổ điển, vừa ăn vừa ngắm dòng người dạo phố cổ.",
+      },
+    ];
+  }
+
+  // 6. Gần Vũ Lăng Nguyên (Wulingyuan) - Trương Gia Giới
+  if (placeKey.includes("vũ lăng nguyên") || placeKey.includes("wulingyuan") || placeKey.includes("bách long") || placeKey.includes("thiên tử")) {
+    return [
+      {
+        name_vn: "Ngân Mãn Đẩu Thổ Thái Quán (Khu Vũ Lăng Nguyên)",
+        name_zh: "银满斗土菜馆 (武陵源店)",
+        address_hint: "Đường Vũ Lăng, cách cổng Đông khu thắng cảnh Vũ Lăng Nguyên 800m",
+        amap_query: "银满斗土菜馆 武陵源",
+        price_range: "~45 - 75 ¥/người",
+        rating: "4.8★ (Đặc sản núi rừng Tương Tây)",
+        recommended_dish: "Vịt hầm hạt dẻ rừng & Cá suối kho tương dưa chua",
+        specialty_note: "Rất thích hợp dùng bữa trưa hoặc tối sau khi đi bộ tham quan khu rừng đá Vũ Lăng Nguyên về.",
+      },
+      {
+        name_vn: "Nhà Hàng Thổ Gia Trại Khê Bố",
+        name_zh: "溪布街土家特色餐馆",
+        address_hint: "Phố đi bộ Khê Bố, quận Vũ Lăng Nguyên",
+        amap_query: "溪布街 特色餐饮",
+        price_range: "~40 - 70 ¥/người",
+        rating: "4.7★ (Không gian nhà sàn Thổ Gia)",
+        recommended_dish: "Thịt lợn gác bếp xào măng vầu & Bánh ngô nướng",
+        specialty_note: "Buổi tối có biểu diễn múa khèn đốt lửa trại náo nhiệt ven suối.",
+      },
+    ];
+  }
+
+  // 7. Gần Thiên Môn Sơn / Cáp treo Đại Dung (Tianmenshan)
+  if (placeKey.includes("thiên môn sơn") || placeKey.includes("tianmen") || placeKey.includes("đại dung") || cityKey.includes("trương gia giới") || cityKey.includes("zhangjiajie")) {
+    return [
+      {
+        name_vn: "Hồ Sư Phụ Tam Hạ Oa (Gần Ga Cáp Treo Thiên Môn Sơn)",
+        name_zh: "胡师傅三下锅 (大庸桥店)",
+        address_hint: "Số 117 đường Tử Ngọ, cách ga cáp treo Thiên Môn Sơn ~1.2km",
+        amap_query: "胡师傅三下锅",
+        price_range: "~55 - 80 ¥/người",
+        rating: "4.8★ (Top 1 Lẩu xào khô Trương Gia Giới)",
+        recommended_dish: "Tam Hạ Oa lẩu xào khô lòng heo, thịt ba chỉ hun khói và đậu hũ",
+        specialty_note: "Quán địa phương nổi tiếng nhất thành phố, sau khi xuống cáp treo ghé ăn rất tiện đường.",
+      },
+      {
+        name_vn: "Quán Cơm Niêu Đất Tương Tây Thuận Nông",
+        name_zh: "顺农土钵菜 (回龙观店)",
+        address_hint: "Đường Hồi Long Quan, quận Vĩnh Định, Trương Gia Giới",
+        amap_query: "张家界 土钵菜",
+        price_range: "~35 - 60 ¥/người",
+        rating: "4.6★ (Bình dân ngon miệng)",
+        recommended_dish: "Gà đồi hấp niêu đất & Rau rừng luộc chấm kho quẹt",
+        specialty_note: "Đồ ăn tươi trong ngày, giá niêm yết rõ ràng.",
+      },
+    ];
+  }
+
+  // 8. Gần Phượng Hoàng Cổ Trấn (Fenghuang Ancient Town)
+  if (cityKey.includes("phượng hoàng") || cityKey.includes("fenghuang") || placeKey.includes("đà giang") || placeKey.includes("hồng kiều")) {
     return [
       {
         name_vn: "Nhà Hàng Miêu Gia Vạn Thọ Cung (Bờ Nam Đà Giang)",
         name_zh: "苗家万寿宫特色菜馆",
-        address_hint: "Đoạn cầu Hồng Kiều, phố cổ Phượng Hoàng",
-        amap_query: "凤凰古城苗家酸汤鱼",
+        address_hint: "Ngay sát chân cầu Hồng Kiều, phố cổ Phượng Hoàng (Bàn sát mép sông)",
+        amap_query: "苗家万寿宫特色菜馆 凤凰",
         price_range: "~60 - 90 ¥/người",
-        rating: "4.8★ (View ngắm sông)",
+        rating: "4.8★ (View ngắm trọn cầu Hồng Kiều & thuyền trôi)",
         recommended_dish: "Lẩu cá trê om dưa chua Miêu Gia & Vịt hầm tiết gạo nếp",
-        specialty_note: "Có bàn sát ban công gỗ ngắm trọn cảnh thuyền trôi và cầu Hồng Kiều lên đèn lung linh.",
+        specialty_note: "Nằm ngay điểm tham quan trung tâm, nên đặt bàn ban công trước 17:30 để ngắm đèn lồng lên tuyệt đẹp.",
       },
       {
         name_vn: "Tiệm Cơm Niêu Đất Tuấn Sư Phụ",
         name_zh: "俊师傅钵子菜",
-        address_hint: "Khu phố mới ven tường thành cổ Phượng Hoàng",
-        amap_query: "俊师傅钵子菜",
+        address_hint: "Khu tường thành cổ Phượng Hoàng",
+        amap_query: "俊师傅钵子菜 凤凰",
         price_range: "~40 - 65 ¥/người",
-        rating: "4.6★ (Bình dân ngon)",
-        recommended_dish: "Thịt lợn hun khói xào măng tre bản địa & Rau củ vùng cao xào mỡ",
-        specialty_note: "Món ăn đượm vị mộc mạc vùng biên ải, giá cả minh bạch không chặt chém.",
+        rating: "4.6★ (Chuẩn vị biên ải Tương Tây)",
+        recommended_dish: "Thịt lợn hun khói xào măng tre bản địa & Canh đậu phụ cá sông",
+        specialty_note: "Chủ quán nhiệt tình, cách cầu đá nhảy 5 phút đi bộ.",
       },
     ];
   }
 
-  if (cityKey.includes("trùng khánh") || cityKey.includes("chongqing")) {
+  // 9. Gần Đại Phật Lạc Sơn (Leshan Giant Buddha)
+  if (placeKey.includes("lạc sơn") || placeKey.includes("leshan") || placeKey.includes("đại phật")) {
     return [
       {
-        name_vn: "Lẩu Cửu Cung Cách Chu Sư Phụ (Gần Hồng Nhai Động)",
-        name_zh: "周师兄重庆火锅 (解放碑/洪崖洞店)",
-        address_hint: "Gần phố đi bộ Đài Giải Phóng, quận Du Trung, Trùng Khánh",
-        amap_query: "周师兄火锅 解放碑",
-        price_range: "~85 - 120 ¥/người",
-        rating: "4.9★ (Di sản phi vật thể ẩm thực)",
-        recommended_dish: "Nồi lẩu 9 ô (ngưu bách diệp, thịt bò ớt cay, dạ sách giòn)",
-        specialty_note: "Nước lẩu thơm ngậy thảo mộc cay tê Tứ Xuyên, có phục vụ trà hoa cúc giải cay.",
+        name_vn: "Tiệm Gà Bát Tiêu Tiêu Triệu Thị (Bến Thuyền Lạc Sơn)",
+        name_zh: "赵鸭子·乐山钵钵鸡 (大佛景区店)",
+        address_hint: "Gần bến tàu du thuyền ngắm Đại Phật Lạc Sơn",
+        amap_query: "赵鸭子 乐山",
+        price_range: "~35 - 60 ¥/người",
+        rating: "4.8★ (Đặc sản trứ danh Lạc Sơn)",
+        recommended_dish: "Xiên que Bát Bát Kê ướp sốt dầu ớt mè giòn & Vịt ngọt Lạc Sơn",
+        specialty_note: "Sau khi đi thuyền ngắm tượng Phật ghé ăn ngay bên bờ sông rất thuận tiện.",
       },
       {
-        name_vn: "Mì Tiêu Cay Bát Nhất Hảo Hữu Lai",
-        name_zh: "好又来酸辣粉 (八一路好吃街)",
-        address_hint: "Phố ẩm thực Bát Nhất (Haochi Jie), Giải Phóng Bi",
-        amap_query: "好又来酸辣粉 八一路",
-        price_range: "~15 - 25 ¥/người",
-        rating: "4.7★ (Món ăn đường phố huyền thoại)",
-        recommended_dish: "Miến chua cay tương thịt bằm & Bánh nếp giòn đường nâu",
-        specialty_note: "Luôn đông nghịt người xếp hàng cầm tô vừa đi vừa ăn, sợi miến dẻo dai chua cay bùng nổ.",
+        name_vn: "Đậu Phụ Hoa Tây Bá (Cổng Thắng Cảnh Lạc Sơn)",
+        name_zh: "西坝豆腐",
+        address_hint: "Khu vực cổng vào Khu thắng cảnh Lạc Sơn",
+        amap_query: "乐山 西坝豆腐",
+        price_range: "~30 - 50 ¥/người",
+        rating: "4.7★ (Mềm mịn thanh mát)",
+        recommended_dish: "Đậu phụ Tây Bá sốt gấm hoa & Bánh bao nhân nấm",
+        specialty_note: "Nổi tiếng với nguồn nước suối trong làm đậu hũ béo ngậy mềm tan.",
       },
     ];
   }
 
-  if (cityKey.includes("thành đô") || cityKey.includes("chengdu")) {
+  // 10. Gần Núi Thanh Thành (Mount Qingcheng)
+  if (placeKey.includes("thanh thành") || placeKey.includes("qingcheng")) {
     return [
       {
-        name_vn: "Trần Ma Bà Đậu Phụ (Cơ sở lâu năm)",
-        name_zh: "陈麻婆豆腐 (总店)",
-        address_hint: "Số 197 đường Thanh Hoa, quận Thanh Dương, Thành Đô",
-        amap_query: "陈麻婆豆腐 总店",
-        price_range: "~50 - 80 ¥/người",
-        rating: "4.8★ (Thủy tổ Đậu phụ Tứ Xuyên từ năm 1862)",
-        recommended_dish: "Đậu phụ Tứ Xuyên tê cay chuẩn gốc & Thịt heo thái mỏng hấp bột bắp",
-        specialty_note: "Vị cay nồng từ hạt hoa tiêu Hán Nguyên và sốt tương đậu Pixian danh tiếng.",
-      },
-      {
-        name_vn: "Nhà Hàng Bánh Thỏ & Mì Đan Đan Trương Lão Đại",
-        name_zh: "张老二凉粉 (文殊院店)",
-        address_hint: "Đối diện cổng chùa Văn Thù Viện, Thành Đô",
-        amap_query: "张老二凉粉 文殊院",
-        price_range: "~20 - 35 ¥/người",
-        rating: "4.7★ (Ẩm thực đường phố Thành Đô)",
-        recommended_dish: "Mì Dan Dan sốt cay & Thạch đậu nguội sốt tương ngọt cay",
-        specialty_note: "Nằm ngay khu phố cổ thanh bình quanh chùa Văn Thù, không gian đậm nét Tứ Xuyên hoài cổ.",
+        name_vn: "Quán Ăn Dưỡng Sinh Đạo Gia Thanh Thành (Chân Núi Tiền Sơn)",
+        name_zh: "青城山道家白果炖鸡 (山脚店)",
+        address_hint: "Ngay cổng Trung tâm Du khách Tiền Sơn Núi Thanh Thành",
+        amap_query: "青城山 白果炖鸡",
+        price_range: "~45 - 75 ¥/người",
+        rating: "4.8★ (Đặc sản dưỡng sinh Đạo giáo)",
+        recommended_dish: "Gà đồi hầm quả bạch quả Thanh Thành & Trà thảo dược Đạo gia",
+        specialty_note: "Sau khi leo núi xuống có tô gà hầm nóng hổi bồi bổ sức khỏe rất ấm bụng.",
       },
     ];
   }
 
-  // General fallback
+  // General fallback by city
   return [
     {
-      name_vn: `Nhà Hàng Ẩm Thực Bản Địa ${params.city}`,
-      name_zh: `${params.city}老字号地方菜馆`,
-      address_hint: `Khu trung tâm ẩm thực & phố đi bộ ${params.city}`,
-      amap_query: `${params.city} 地方菜`,
-      price_range: "~50 - 85 ¥/người",
+      name_vn: `Nhà Hàng Đặc Sản ${params.placeName ? `Gần ${params.placeName}` : params.city}`,
+      name_zh: `${params.placeName || params.city} 地方菜馆`,
+      address_hint: `Khu vực phụ cận ${params.placeName || `trung tâm ${params.city}`}`,
+      amap_query: `${params.placeName || params.city} 美食`,
+      price_range: "~45 - 80 ¥/người",
       rating: "4.7★ (Dianping)",
       recommended_dish: params.dishName || `Món ăn đặc sản ${params.city}`,
-      specialty_note: "Quán đông khách địa phương, nguyên liệu tươi ngon trong ngày.",
+      specialty_note: "Vị trí thuận tiện ngay gần lịch trình, nguyên liệu tươi ngon trong ngày.",
     },
     {
-      name_vn: `Phố Ẩm Thực Đêm Nổi Tiếng ${params.city}`,
-      name_zh: `${params.city}特色美食夜市`,
-      address_hint: `Khu phố cổ / trung tâm thương mại ${params.city}`,
-      amap_query: `${params.city} 美食街`,
-      price_range: "~30 - 60 ¥/người",
-      rating: "4.6★ (Đa dạng phong phú)",
-      recommended_dish: "Các món ăn vặt và xiên nướng bản địa",
-      specialty_note: "Mở cửa từ chiều muộn đến đêm khuya, không khí sôi động náo nhiệt.",
+      name_vn: `Phố Ẩm Thực Bản Địa ${params.city}`,
+      name_zh: `${params.city} 美食特色街`,
+      address_hint: `Cách ${params.placeName || `trung tâm ${params.city}`} bán kính đi bộ ngắn`,
+      amap_query: `${params.city} 特色小吃街`,
+      price_range: "~25 - 55 ¥/người",
+      rating: "4.6★ (Đa dạng món ngon)",
+      recommended_dish: "Các món ăn vặt và đặc sản nóng hổi",
+      specialty_note: "Nhiều lựa chọn phong phú, thích hợp cho cả gia đình và nhóm bạn.",
     },
   ];
 }

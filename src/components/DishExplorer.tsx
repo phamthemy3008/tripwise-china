@@ -183,6 +183,7 @@ export const DishExplorer: React.FC<DishExplorerProps> = ({
           dishZh: dish.dish_name_zh,
           city: cityName || "Trung Quốc",
           placeName: placeName,
+          placeZh: placeZh,
         }),
       });
 
@@ -220,6 +221,7 @@ export const DishExplorer: React.FC<DishExplorerProps> = ({
         body: JSON.stringify({
           city: cityName || "Trung Quốc",
           placeName: placeName,
+          placeZh: placeZh,
         }),
       });
 
@@ -566,7 +568,9 @@ export const DishExplorer: React.FC<DishExplorerProps> = ({
                     ) : (
                       <>
                         <Store className="w-3 h-3 text-amber-600" />
-                        <span>Gợi ý quán ăn nổi tiếng cho món này</span>
+                        <span>
+                          Gợi ý quán ăn gần {placeName ? placeName : "vị trí này"}
+                        </span>
                       </>
                     )}
                   </button>
@@ -578,7 +582,9 @@ export const DishExplorer: React.FC<DishExplorerProps> = ({
                 <div className="mt-1 space-y-2 border-t border-amber-200/50 dark:border-amber-900/40 pt-2">
                   <div className="text-[11px] font-bold text-amber-900 dark:text-amber-400 flex items-center gap-1">
                     <Sparkles className="w-3 h-3 text-amber-600" />
-                    <span>Quán ngon thưởng thức {dish.dish_name_vn}:</span>
+                    <span>
+                      Quán ngon gần {placeName || "vị trí này"} cho món {dish.dish_name_vn}:
+                    </span>
                   </div>
 
                   {extraRestaurants.map((resto, rIdx) => (

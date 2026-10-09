@@ -806,6 +806,8 @@ function MainApp() {
                         event={event}
                         index={idx}
                         cityName={activeDayPlan.city}
+                        hotel={activeDayPlan.hotel}
+                        previousEvent={idx > 0 ? activeDayPlan.events[idx - 1] : undefined}
                       />
                     ))}
                   </div>
