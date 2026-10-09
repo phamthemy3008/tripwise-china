@@ -2,6 +2,8 @@ import express, { Request, Response } from "express";
 import multer from "multer";
 import mammoth from "mammoth";
 import dotenv from "dotenv";
+import fs from "fs";
+import path from "path";
 import { parseTripWithGemini, suggestActivities } from "./src/lib/gemini.js";
 import { SAMPLE_TRIPS } from "./src/data/sampleTrips.js";
 
@@ -9,6 +11,31 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Persistent disk storage for multi-device synchronization (PC & Phone)
+const DATA_DIR = path.resolve(process.cwd(), "data");
+const TRIPS_FILE = path.join(DATA_DIR, "user_trips.json");
+
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+let userTripsMap: Record<string, any[]> = {};
+if (fs.existsSync(TRIPS_FILE)) {
+  try {
+    userTripsMap = JSON.parse(fs.readFileSync(TRIPS_FILE, "utf-8"));
+  } catch (e) {
+    userTripsMap = {};
+  }
+}
+
+function saveUserTripsToDisk() {
+  try {
+    fs.writeFileSync(TRIPS_FILE, JSON.stringify(userTripsMap, null, 2), "utf-8");
+  } catch (e) {
+    console.error("Failed to save user trips to disk:", e);
+  }
+}
 
 // Setup Multer for in-memory file parsing (.docx, .txt, .md)
 const upload = multer({
@@ -309,7 +336,51 @@ app.post("/api/suggest-activities", async (req: Request, res: Response) => {
   }
 });
 
-// API: CRUD Trips
+// API: Synchronized User Trips (Works seamlessly between PC & Phone)
+app.get("/api/user-trips/:uid", (req: Request, res: Response) => {
+  const { uid } = req.params;
+  if (!userTripsMap[uid] || userTripsMap[uid].length === 0) {
+    userTripsMap[uid] = [...SAMPLE_TRIPS];
+    saveUserTripsToDisk();
+  }
+  res.json({ success: true, data: userTripsMap[uid] });
+});
+
+app.post("/api/user-trips/:uid", (req: Request, res: Response) => {
+  const { uid } = req.params;
+  const trip = req.body;
+  if (!trip || !trip.trip_title) {
+    res.status(400).json({ error: "Lịch trình không hợp lệ." });
+    return;
+  }
+  const tripId = trip.id || `trip_${Date.now()}`;
+  const preparedTrip = { ...trip, id: tripId };
+
+  if (!userTripsMap[uid]) {
+    userTripsMap[uid] = [...SAMPLE_TRIPS];
+  }
+
+  const existingIdx = userTripsMap[uid].findIndex((t) => t.id === tripId);
+  if (existingIdx >= 0) {
+    userTripsMap[uid][existingIdx] = preparedTrip;
+  } else {
+    userTripsMap[uid].unshift(preparedTrip);
+  }
+
+  saveUserTripsToDisk();
+  res.json({ success: true, data: userTripsMap[uid] });
+});
+
+app.delete("/api/user-trips/:uid/:tripId", (req: Request, res: Response) => {
+  const { uid, tripId } = req.params;
+  if (userTripsMap[uid]) {
+    userTripsMap[uid] = userTripsMap[uid].filter((t) => t.id !== tripId);
+    saveUserTripsToDisk();
+  }
+  res.json({ success: true, data: userTripsMap[uid] || [] });
+});
+
+// API: CRUD Trips (Legacy/fallback)
 app.get("/api/trips", (_req: Request, res: Response) => {
   res.json({ success: true, data: serverTrips });
 });

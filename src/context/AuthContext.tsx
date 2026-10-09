@@ -5,7 +5,12 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged,
 } from "firebase/auth";
-import { auth, googleProvider, isFirebaseConfigured } from "../lib/firebaseClient";
+import {
+  auth,
+  googleProvider,
+  isFirebaseConfigured,
+  ensureFirebaseReady,
+} from "../lib/firebaseClient";
 import { toast } from "sonner";
 
 interface AuthContextType {
@@ -14,7 +19,6 @@ interface AuthContextType {
   isConfigured: boolean;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
-  mockSignIn?: (email?: string, name?: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -28,69 +32,85 @@ const AuthContext = createContext<AuthContextType>({
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [configured, setConfigured] = useState(isFirebaseConfigured);
 
   useEffect(() => {
-    if (auth && isFirebaseConfigured) {
-      const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-        setUser(currentUser);
-        setLoading(false);
-      });
-      return () => unsubscribe();
-    } else {
-      // Check if local simulated user session exists (for preview/testing before keys are entered)
-      const cachedUser = localStorage.getItem("tripwise_demo_user");
-      if (cachedUser) {
-        try {
-          setUser(JSON.parse(cachedUser));
-        } catch {
-          setUser(null);
+    let unsubscribe: (() => void) | undefined;
+    let isMounted = true;
+
+    ensureFirebaseReady().then((ready) => {
+      if (!isMounted) return;
+      setConfigured(ready);
+
+      if (ready && auth) {
+        unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+          if (!isMounted) return;
+          setUser(currentUser);
+          setLoading(false);
+        });
+      } else {
+        // Check if demo user was cached
+        const cachedUser = localStorage.getItem("tripwise_demo_user");
+        if (cachedUser) {
+          try {
+            setUser(JSON.parse(cachedUser));
+          } catch {
+            setUser(null);
+          }
         }
+        setLoading(false);
       }
-      setLoading(false);
-    }
+    });
+
+    return () => {
+      isMounted = false;
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const signInWithGoogle = async () => {
-    if (!isFirebaseConfigured || !auth) {
-      toast.warning("Chưa cấu hình Firebase API Keys trong file .env!", {
-        description: "Đang bật chế độ Demo Test để bạn có thể xem giao diện...",
-        duration: 4000,
+    const ready = await ensureFirebaseReady();
+
+    if (ready && auth) {
+      try {
+        const result = await signInWithPopup(auth, googleProvider);
+        setUser(result.user);
+        toast.success(`Chào mừng ${result.user.displayName || "bạn"}!`, {
+          description: "Đã đăng nhập thành công tài khoản Google",
+        });
+      } catch (err: any) {
+        console.error("Lỗi đăng nhập Google:", err);
+        if (err.code === "auth/popup-closed-by-user") {
+          toast.info("Bạn đã đóng cửa sổ đăng nhập");
+        } else if (err.code === "auth/unauthorized-domain") {
+          toast.error(
+            "Tên miền chưa được cấp phép (Authorized domain) trong Firebase Console!",
+            { duration: 6000 }
+          );
+        } else {
+          toast.error(err.message || "Đăng nhập thất bại. Vui lòng thử lại!");
+        }
+      }
+    } else {
+      // Demo fallback if Firebase is not yet provisioned in .env
+      toast.info("Chế độ Thử nghiệm (Demo)", {
+        description: "Đang đăng nhập bằng tài khoản Demo để bạn kiểm tra giao diện...",
+        duration: 3500,
       });
-      // Fallback demo user so the app never crashes
       const demoUser = {
-        uid: "demo_google_user_123",
+        uid: "demo_traveler_global_uid",
         displayName: "Người dùng Thử nghiệm (Demo)",
         email: "demo.traveler@gmail.com",
         photoURL: "https://api.dicebear.com/7.x/avataaars/svg?seed=Traveler",
       } as unknown as User;
       setUser(demoUser);
       localStorage.setItem("tripwise_demo_user", JSON.stringify(demoUser));
-      return;
-    }
-
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      setUser(result.user);
-      toast.success(`Chào mừng ${result.user.displayName || "bạn"}!`, {
-        description: "Đã đăng nhập thành công bằng tài khoản Google",
-      });
-    } catch (err: any) {
-      console.error("Lỗi đăng nhập Google:", err);
-      if (err.code === "auth/popup-closed-by-user") {
-        toast.info("Bạn đã đóng cửa sổ đăng nhập");
-      } else if (err.code === "auth/unauthorized-domain") {
-        toast.error("Tên miền chưa được cấp phép (Authorized domain) trong Firebase Console!", {
-          duration: 5000,
-        });
-      } else {
-        toast.error(err.message || "Đăng nhập thất bại. Vui lòng thử lại!");
-      }
     }
   };
 
   const signOut = async () => {
     try {
-      if (auth && isFirebaseConfigured) {
+      if (auth) {
         await firebaseSignOut(auth);
       }
       setUser(null);
@@ -106,7 +126,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         loading,
-        isConfigured: isFirebaseConfigured,
+        isConfigured: configured,
         signInWithGoogle,
         signOut,
       }}

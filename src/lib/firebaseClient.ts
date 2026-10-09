@@ -38,17 +38,42 @@ function initFirebase(config: typeof buildTimeConfig) {
   }
 }
 
-// Initial attempt with build-time config
-if (isFirebaseConfigured) {
-  initFirebase(buildTimeConfig);
-} else if (typeof window !== "undefined") {
-  // Try fetching runtime config from server /api/config
-  fetch("/api/config")
-    .then((res) => res.json())
-    .then((data) => {
-      if (data?.firebase?.apiKey && data?.firebase?.projectId) {
-        initFirebase(data.firebase);
+let initPromise: Promise<boolean> | null = null;
+
+export async function ensureFirebaseReady(): Promise<boolean> {
+  if (initPromise) return initPromise;
+
+  if (isFirebaseConfigured && auth && db) {
+    return true;
+  }
+
+  initPromise = (async () => {
+    // 1. Try build time config
+    if (buildTimeConfig.apiKey && buildTimeConfig.projectId) {
+      initFirebase(buildTimeConfig);
+      return true;
+    }
+
+    // 2. Fetch runtime config from server /api/config
+    if (typeof window !== "undefined") {
+      try {
+        const res = await fetch("/api/config");
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.firebase?.apiKey && data?.firebase?.projectId) {
+            initFirebase(data.firebase);
+            return true;
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to load /api/config:", err);
       }
-    })
-    .catch(() => {});
+    }
+    return false;
+  })();
+
+  return initPromise;
 }
+
+// Initial eager check
+ensureFirebaseReady();

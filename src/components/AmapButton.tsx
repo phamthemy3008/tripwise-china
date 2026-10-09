@@ -1,5 +1,5 @@
 import React from "react";
-import { Navigation, ExternalLink } from "lucide-react";
+import { MapPin, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
 interface AmapButtonProps {
@@ -10,7 +10,7 @@ interface AmapButtonProps {
 
 export const AmapButton: React.FC<AmapButtonProps> = ({
   query,
-  label = "Mở Bản đồ Amap (高德地图)",
+  label = "Xem vị trí Amap (高德地图)",
   className = "",
 }) => {
   const handleAmapOpen = (e: React.MouseEvent) => {
@@ -21,15 +21,17 @@ export const AmapButton: React.FC<AmapButtonProps> = ({
     const isAndroid = /Android/.test(ua);
     const isMobile = isIOS || isAndroid;
 
-    // Native App Deep Links
-    // iOS: iosamap://viewMap or iosamap://poi
-    const iosDeepLink = `iosamap://poi?sourceApplication=tripwise&keywords=${encoded}&dev=0`;
-    // Android: androidamap://viewMap or intent
-    const androidDeepLink = `androidamap://poi?sourceApplication=tripwise&keywords=${encoded}&dev=0`;
-    const androidIntent = `intent://poi?sourceApplication=tripwise&keywords=${encoded}&dev=0#Intent;scheme=androidamap;package=com.autonavi.minimap;end`;
+    // 1. POI View Map scheme (Chỉ mở ghim vị trí địa danh trên bản đồ, KHÔNG vẽ lộ trình dẫn đường)
+    // iOS: iosamap://viewMap?sourceApplication=tripwise&poiname=...
+    const iosViewMapUrl = `iosamap://viewMap?sourceApplication=tripwise&poiname=${encoded}&dev=0`;
 
-    // Official Mobile Web Fallback URL
-    const webAmapUrl = `https://uri.amap.com/search?keyword=${encoded}`;
+    // Android: androidamap://viewMap?sourceApplication=tripwise&poiname=...
+    const androidViewMapUrl = `androidamap://viewMap?sourceApplication=tripwise&poiname=${encoded}&dev=0`;
+    const androidIntentUrl = `intent://viewMap?sourceApplication=tripwise&poiname=${encoded}&dev=0#Intent;scheme=androidamap;package=com.autonavi.minimap;end`;
+
+    // 2. Official Universal Web URL with callnative=1 (Tự động đánh thức App Amap vào trang tìm kiếm địa điểm)
+    const webAmapNativeUrl = `https://uri.amap.com/search?keyword=${encoded}&src=tripwise&callnative=1`;
+    const webAmapStandardUrl = `https://uri.amap.com/search?keyword=${encoded}`;
 
     // Auto-copy Chinese keyword to clipboard
     if (navigator.clipboard) {
@@ -37,41 +39,39 @@ export const AmapButton: React.FC<AmapButtonProps> = ({
     }
 
     if (isMobile) {
-      toast.info("Đang đánh thức ứng dụng Amap (高德地图)...", {
-        description: `Đã tự động sao chép chữ Hán: "${query}"`,
+      toast.info("Đang mở vị trí trên Bản đồ Amap Cao Đức...", {
+        description: `Địa danh: "${query}" (Đã tự động copy chữ Hán)`,
         duration: 2500,
       });
 
       const startTime = Date.now();
 
-      // Trigger app launch
+      // Launch native app to ONLY view the location on map
       if (isIOS) {
-        window.location.href = iosDeepLink;
+        window.location.href = iosViewMapUrl;
       } else if (isAndroid) {
-        // Use androidamap scheme first, fallback to intent
         try {
-          window.location.href = androidDeepLink;
+          window.location.href = androidViewMapUrl;
         } catch {
-          window.location.href = androidIntent;
+          window.location.href = androidIntentUrl;
         }
       } else {
-        window.location.href = webAmapUrl;
+        window.location.href = webAmapNativeUrl;
       }
 
-      // If user doesn't have Amap app installed, fallback to web version after 1.8s
+      // If user doesn't have Amap app installed or viewMap didn't trigger, fallback to official web search with callnative
       setTimeout(() => {
-        // If still on page and document is visible
         if (!document.hidden && Date.now() - startTime < 3000) {
-          window.location.href = webAmapUrl;
+          window.location.href = webAmapNativeUrl;
         }
-      }, 1800);
+      }, 1600);
     } else {
       // Desktop PC: Open browser web version
       toast.info("Đang mở bản đồ Amap trên trình duyệt...", {
         description: `Tìm kiếm địa danh: "${query}"`,
         duration: 2000,
       });
-      window.open(webAmapUrl, "_blank", "noopener,noreferrer");
+      window.open(webAmapStandardUrl, "_blank", "noopener,noreferrer");
     }
   };
 
@@ -80,9 +80,9 @@ export const AmapButton: React.FC<AmapButtonProps> = ({
       type="button"
       onClick={handleAmapOpen}
       className={`w-full flex items-center justify-center gap-2 py-2 px-3.5 bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 dark:text-blue-300 rounded-xl text-xs font-semibold transition-all duration-150 border border-blue-200 dark:border-blue-800 active:scale-[0.98] cursor-pointer shadow-xs ${className}`}
-      title="Mở ứng dụng hoặc web bản đồ Amap Cao Đức"
+      title="Mở ghim vị trí địa danh trên Bản đồ Amap Cao Đức"
     >
-      <Navigation className="w-3.5 h-3.5 fill-blue-600 text-blue-600 dark:fill-blue-400 dark:text-blue-400" />
+      <MapPin className="w-3.5 h-3.5 text-red-500 fill-red-500 shrink-0" />
       <span>{label}</span>
       <ExternalLink className="w-3 h-3 text-blue-400 opacity-60 ml-auto" />
     </button>
