@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { Toaster, toast } from "sonner";
 import { TripDocument } from "./types/itinerary";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import { LoginScreen } from "./components/LoginScreen";
 import {
-  getSavedTrips,
-  saveTrip,
-  deleteTrip,
-  getActiveTripId,
-  setActiveTripId,
-} from "./lib/storage";
+  getUserTrips,
+  saveUserTrip,
+  deleteUserTrip,
+} from "./lib/firestoreTrips";
 import { SAMPLE_TRIPS } from "./data/sampleTrips";
 import { DayTabs } from "./components/DayTabs";
 import { TimelineCard } from "./components/TimelineCard";
@@ -32,9 +32,13 @@ import {
   X,
   Sparkles,
   BookOpen,
+  LogOut,
+  User,
+  Loader2,
 } from "lucide-react";
 
-export function App() {
+function MainApp() {
+  const { user, loading: authLoading, signOut } = useAuth();
   const [trips, setTrips] = useState<TripDocument[]>([]);
   const [currentTripId, setCurrentTripId] = useState<string>("");
   const [selectedDayNumber, setSelectedDayNumber] = useState<number>(1);
@@ -42,81 +46,109 @@ export function App() {
   const [isTripsDrawerOpen, setIsTripsDrawerOpen] = useState<boolean>(false);
   const [isSurvivalGuideOpen, setIsSurvivalGuideOpen] = useState<boolean>(false);
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
+  const [isLoadingTrips, setIsLoadingTrips] = useState<boolean>(true);
 
-  // Initialize trips from storage
+  // Load user-specific trips whenever user changes
   useEffect(() => {
-    const loadedTrips = getSavedTrips();
-    setTrips(loadedTrips);
+    if (!user) return;
 
-    const activeId = getActiveTripId();
-    if (activeId && loadedTrips.some((t) => t.id === activeId)) {
-      setCurrentTripId(activeId);
-    } else if (loadedTrips.length > 0) {
-      setCurrentTripId(loadedTrips[0].id || "");
-    }
+    let isMounted = true;
+    setIsLoadingTrips(true);
+
+    getUserTrips(user.uid)
+      .then((userTrips) => {
+        if (!isMounted) return;
+        setTrips(userTrips);
+        if (userTrips.length > 0) {
+          setCurrentTripId(userTrips[0].id || "");
+        }
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingTrips(false);
+      });
 
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
 
-    // Register service worker for offline support
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
 
     return () => {
+      isMounted = false;
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
-  }, []);
+  }, [user]);
+
+  // If auth is still checking
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4">
+        <Loader2 className="w-8 h-8 text-amber-500 animate-spin mb-3" />
+        <p className="text-xs text-slate-400 font-medium">Đang kiểm tra phiên đăng nhập...</p>
+      </div>
+    );
+  }
+
+  // Mandatory Login Gate: User MUST be logged in
+  if (!user) {
+    return <LoginScreen />;
+  }
 
   const currentTrip = trips.find((t) => t.id === currentTripId) || trips[0];
-
-  // Set selected day safely
   const activeDayPlan =
     currentTrip?.days?.find((d) => d.day_number === selectedDayNumber) ||
     currentTrip?.days?.[0];
 
   const handleSelectTrip = (id: string) => {
     setCurrentTripId(id);
-    setActiveTripId(id);
     setSelectedDayNumber(1);
     setIsTripsDrawerOpen(false);
     toast.info("Đã chuyển sang lịch trình mới");
   };
 
-  const handleImportParsed = (newTrip: TripDocument) => {
-    const updated = saveTrip(newTrip);
-    setTrips(updated);
-    setCurrentTripId(newTrip.id || "");
-    setSelectedDayNumber(1);
-    setIsImportModalOpen(false);
-    toast.success("Đã lưu lịch trình thành công vào máy!");
+  const handleImportParsed = async (newTrip: TripDocument) => {
+    try {
+      const updated = await saveUserTrip(user.uid, newTrip);
+      setTrips(updated);
+      setCurrentTripId(newTrip.id || "");
+      setSelectedDayNumber(1);
+      setIsImportModalOpen(false);
+      toast.success("Đã lưu lịch trình vào tài khoản cá nhân!");
+    } catch {
+      toast.error("Không thể lưu lịch trình. Vui lòng thử lại!");
+    }
   };
 
-  const handleSelectSample = (sampleId: string) => {
+  const handleSelectSample = async (sampleId: string) => {
     const sample = SAMPLE_TRIPS.find((s) => s.id === sampleId);
     if (sample) {
-      const updated = saveTrip(sample);
+      const updated = await saveUserTrip(user.uid, sample);
       setTrips(updated);
       setCurrentTripId(sample.id || "");
       setSelectedDayNumber(1);
       setIsImportModalOpen(false);
-      toast.success(`Đã mở: ${sample.trip_title}`);
+      toast.success(`Đã thêm lịch trình: ${sample.trip_title}`);
     }
   };
 
-  const handleDeleteCurrentTrip = (tripId: string) => {
+  const handleDeleteCurrentTrip = async (tripId: string) => {
     if (trips.length <= 1) {
       toast.warning("Bạn cần giữ lại ít nhất một lịch trình du lịch");
       return;
     }
-    const updated = deleteTrip(tripId);
-    setTrips(updated);
-    setCurrentTripId(updated[0]?.id || "");
-    setSelectedDayNumber(1);
-    toast.success("Đã xóa lịch trình");
+    try {
+      const updated = await deleteUserTrip(user.uid, tripId);
+      setTrips(updated);
+      setCurrentTripId(updated[0]?.id || "");
+      setSelectedDayNumber(1);
+      toast.success("Đã xóa lịch trình khỏi tài khoản");
+    } catch {
+      toast.error("Lỗi khi xóa lịch trình");
+    }
   };
 
   const handleExportJSON = () => {
@@ -150,7 +182,7 @@ export function App() {
     navigator.clipboard
       .writeText(summary)
       .then(() => {
-        toast.success("Đã sao chép tóm tắt lịch trình để gửi Zalo / Wechat!");
+        toast.success("Đã sao chép tóm tắt lịch trình để gửi Zalo / WeChat!");
       })
       .catch(() => {
         toast.error("Không thể sao chép");
@@ -164,7 +196,7 @@ export function App() {
         <div className="max-w-4xl mx-auto px-3 sm:px-4 h-16 flex items-center justify-between gap-2">
           {/* Brand */}
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center text-slate-950 shadow-md">
+            <div className="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center text-slate-950 shadow-md shrink-0">
               <Compass className="w-5 h-5" />
             </div>
             <div>
@@ -173,11 +205,11 @@ export function App() {
                   TripWise <span className="text-amber-400">China</span>
                 </span>
                 <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                  <ShieldCheck className="w-3 h-3 text-emerald-400" /> Offline Ready
+                  <ShieldCheck className="w-3 h-3 text-emerald-400" /> Cloud Sync
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400 -mt-0.5 hidden xs:block">
-                Lịch trình thông minh &bull; Amap &bull; Ẩm thực Baidu &bull; Ngoại tuyến
+              <p className="text-[10px] text-slate-400 -mt-0.5 hidden xs:block truncate max-w-[180px]">
+                {user.email || user.displayName}
               </p>
             </div>
           </div>
@@ -215,6 +247,29 @@ export function App() {
               <Plus className="w-4 h-4 stroke-[2.5]" />
               <span>Nhập File / AI</span>
             </button>
+
+            {/* User Profile / Logout */}
+            <div className="relative flex items-center pl-1 sm:pl-2 border-l border-slate-800">
+              <button
+                type="button"
+                onClick={signOut}
+                className="flex items-center gap-1.5 p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-red-400 transition-colors cursor-pointer"
+                title={`Đăng xuất (${user.email || user.displayName})`}
+              >
+                {user.photoURL ? (
+                  <img
+                    src={user.photoURL}
+                    alt={user.displayName || "Avatar"}
+                    className="w-7 h-7 rounded-full border border-slate-700"
+                  />
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-slate-800 flex items-center justify-center text-slate-300 border border-slate-700">
+                    <User className="w-3.5 h-3.5" />
+                  </div>
+                )}
+                <LogOut className="w-3.5 h-3.5 hidden sm:block" />
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -223,13 +278,18 @@ export function App() {
       {!isOnline && (
         <div className="bg-amber-600 text-white text-xs py-1.5 px-4 text-center font-medium flex items-center justify-center gap-2 no-print">
           <WifiOff className="w-3.5 h-3.5" />
-          <span>Bạn đang ở chế độ Ngoại Tuyến (Offline). Dữ liệu đã lưu trên máy vẫn hoạt động đầy đủ!</span>
+          <span>Bạn đang ở chế độ Ngoại Tuyến (Offline). Lịch trình cá nhân đã lưu trên máy vẫn tra cứu bình thường!</span>
         </div>
       )}
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-4xl w-full mx-auto pb-16">
-        {currentTrip ? (
+        {isLoadingTrips ? (
+          <div className="p-12 text-center">
+            <Loader2 className="w-8 h-8 animate-spin text-amber-500 mx-auto mb-3" />
+            <p className="text-xs text-slate-500">Đang đồng bộ lịch trình cá nhân...</p>
+          </div>
+        ) : currentTrip ? (
           <div>
             {/* Trip Hero Banner */}
             <div className="bg-gradient-to-b from-slate-900 to-slate-800 text-white px-4 pt-6 pb-5 border-b border-slate-800 shadow-sm">
@@ -452,9 +512,14 @@ export function App() {
             <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FolderOpen className="w-5 h-5 text-amber-500" />
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  Danh Sách Lịch Trình ({trips.length})
-                </h3>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    Lịch Trình Của Bạn ({trips.length})
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Tài khoản: {user.email || user.displayName}
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => setIsTripsDrawerOpen(false)}
@@ -535,6 +600,14 @@ export function App() {
       {/* Global Toast Container */}
       <Toaster position="top-center" richColors />
     </div>
+  );
+}
+
+export function App() {
+  return (
+    <AuthProvider>
+      <MainApp />
+    </AuthProvider>
   );
 }
 
