@@ -21,15 +21,14 @@ export const AmapButton: React.FC<AmapButtonProps> = ({
     const isAndroid = /Android/.test(ua);
     const isMobile = isIOS || isAndroid;
 
-    // Official Gaode Amap POI Search scheme using exact "name" parameter:
-    // iosamap://poi?sourceApplication=...&name=...&keywords=...
-    // androidamap://poi?sourceApplication=...&name=...&keywords=...
+    // Official Gaode Amap POI Search scheme:
+    // iosamap://poi?sourceApplication=tripwise&name=...&keywords=...
+    // androidamap://poi?sourceApplication=tripwise&name=...&keywords=...
     const iosPoiUrl = `iosamap://poi?sourceApplication=tripwise&name=${encoded}&keywords=${encoded}&dev=0`;
     const androidPoiUrl = `androidamap://poi?sourceApplication=tripwise&name=${encoded}&keywords=${encoded}&dev=0`;
     const androidIntentUrl = `intent://poi?sourceApplication=tripwise&name=${encoded}&keywords=${encoded}&dev=0#Intent;scheme=androidamap;package=com.autonavi.minimap;end`;
 
-    // Universal Amap URL with callnative=1
-    const webAmapNativeUrl = `https://uri.amap.com/search?keyword=${encoded}&src=tripwise&callnative=1`;
+    // Standard Web Search URL for desktop or manual fallback
     const webAmapStandardUrl = `https://uri.amap.com/search?keyword=${encoded}`;
 
     // Auto-copy Chinese keyword to clipboard
@@ -38,14 +37,16 @@ export const AmapButton: React.FC<AmapButtonProps> = ({
     }
 
     if (isMobile) {
-      toast.info("Đang tìm vị trí trên Bản đồ Amap Cao Đức...", {
-        description: `Tìm kiếm: "${query}" (Đã tự động copy chữ Hán)`,
-        duration: 2500,
+      toast.info("Đang mở ứng dụng Bản đồ Amap...", {
+        description: `Địa danh: "${query}" (Đã tự động copy chữ Hán)`,
+        duration: 3500,
+        action: {
+          label: "Mở trên Web",
+          onClick: () => window.open(webAmapStandardUrl, "_blank", "noopener,noreferrer"),
+        },
       });
 
-      const startTime = Date.now();
-
-      // Launch native app to search & pin the exact POI location
+      // Launch native app ONLY - DO NOT force browser redirect to avoid double-opening uri.amap.com
       if (isIOS) {
         window.location.href = iosPoiUrl;
       } else if (isAndroid) {
@@ -55,17 +56,10 @@ export const AmapButton: React.FC<AmapButtonProps> = ({
           window.location.href = androidIntentUrl;
         }
       } else {
-        window.location.href = webAmapNativeUrl;
+        window.open(webAmapStandardUrl, "_blank", "noopener,noreferrer");
       }
-
-      // If user doesn't have Amap app installed, fallback to web
-      setTimeout(() => {
-        if (!document.hidden && Date.now() - startTime < 3000) {
-          window.location.href = webAmapNativeUrl;
-        }
-      }, 1600);
     } else {
-      // Desktop PC: Open browser web version
+      // Desktop PC: Open browser web version in a new tab
       toast.info("Đang mở bản đồ Amap trên trình duyệt...", {
         description: `Tìm kiếm địa danh: "${query}"`,
         duration: 2000,
