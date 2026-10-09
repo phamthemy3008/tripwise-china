@@ -89,6 +89,19 @@ function MainApp() {
     };
   }, [user]);
 
+  const currentTrip = trips.find((t) => t.id === currentTripId) || trips[0];
+
+  // Auto-detect which day corresponds to Today
+  const detectedTodayNumber =
+    currentTrip?.days?.find((d) => checkIsToday(d.date))?.day_number || null;
+
+  // Auto-select Today on initial trip load (called unconditionally before returns)
+  useEffect(() => {
+    if (detectedTodayNumber) {
+      setSelectedDayNumber(detectedTodayNumber);
+    }
+  }, [currentTripId, detectedTodayNumber]);
+
   // If auth is still checking
   if (authLoading) {
     return (
@@ -103,19 +116,6 @@ function MainApp() {
   if (!user) {
     return <LoginScreen />;
   }
-
-  const currentTrip = trips.find((t) => t.id === currentTripId) || trips[0];
-
-  // Auto-detect which day corresponds to Today
-  const detectedTodayNumber =
-    currentTrip?.days?.find((d) => checkIsToday(d.date))?.day_number || null;
-
-  // Auto-select Today on initial trip load
-  useEffect(() => {
-    if (detectedTodayNumber) {
-      setSelectedDayNumber(detectedTodayNumber);
-    }
-  }, [currentTripId, detectedTodayNumber]);
 
   const activeDayPlan =
     currentTrip?.days?.find((d) => d.day_number === selectedDayNumber) ||
