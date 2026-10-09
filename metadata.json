@@ -1,0 +1,6 @@
+{
+  "name": "TripWise China - AI Travel Itinerary & Offline Guide",
+  "description": "Lịch trình du lịch Trung Quốc thông minh tích hợp AI Gemini trích xuất file, bản đồ Amap cao đức, tra cứu món ăn Baidu/Google và hỗ trợ ngoại tuyến mượt mà.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
