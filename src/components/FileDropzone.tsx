@@ -1,5 +1,15 @@
 import React, { useState, useRef } from "react";
-import { UploadCloud, FileText, Sparkles, Loader2, FileCode, CheckCircle2, AlertCircle } from "lucide-react";
+import {
+  UploadCloud,
+  FileText,
+  Sparkles,
+  Loader2,
+  FileCode,
+  CheckCircle2,
+  Link2,
+  RefreshCw,
+  ExternalLink,
+} from "lucide-react";
 import { TripDocument } from "../types/itinerary";
 import { toast } from "sonner";
 
@@ -15,8 +25,9 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [textInput, setTextInput] = useState("");
+  const [gdocUrl, setGdocUrl] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState<"file" | "text">("file");
+  const [activeTab, setActiveTab] = useState<"file" | "text" | "gdoc">("file");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDrag = (e: React.DragEvent) => {
@@ -63,39 +74,73 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
       toast.warning("Vui lòng dán văn bản lịch trình du lịch");
       return;
     }
+    if (activeTab === "gdoc" && !gdocUrl.trim()) {
+      toast.warning("Vui lòng dán liên kết tài liệu Google Docs");
+      return;
+    }
 
     setIsProcessing(true);
-    const toastId = toast.loading("Gemini AI đang trích xuất dữ liệu lịch trình...");
+    const toastId = toast.loading(
+      activeTab === "gdoc"
+        ? "Đang đọc tài liệu Google Docs & AI phân tích..."
+        : "Gemini AI đang trích xuất dữ liệu lịch trình..."
+    );
 
     try {
-      const formData = new FormData();
-      if (activeTab === "file" && selectedFile) {
-        formData.append("file", selectedFile);
+      if (activeTab === "gdoc") {
+        const response = await fetch("/api/fetch-google-doc", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: gdocUrl }),
+        });
+
+        const resJson = await response.json();
+        if (!response.ok || !resJson.success) {
+          throw new Error(resJson.error || "Không thể đọc Google Docs");
+        }
+
+        toast.success("Trích xuất Google Docs thành công!", { id: toastId });
+        onParsedSuccess(resJson.data);
       } else {
-        formData.append("text", textInput);
+        const formData = new FormData();
+        if (activeTab === "file" && selectedFile) {
+          formData.append("file", selectedFile);
+        } else {
+          formData.append("text", textInput);
+        }
+
+        const response = await fetch("/api/parse-itinerary", {
+          method: "POST",
+          body: formData,
+        });
+
+        const resJson = await response.json();
+        if (!response.ok || !resJson.success) {
+          throw new Error(resJson.error || "Không thể phân tích dữ liệu lịch trình");
+        }
+
+        toast.success("Trích xuất lịch trình thành công bằng Gemini AI!", {
+          id: toastId,
+        });
+        onParsedSuccess(resJson.data);
       }
-
-      const response = await fetch("/api/parse-itinerary", {
-        method: "POST",
-        body: formData,
-      });
-
-      const resJson = await response.json();
-
-      if (!response.ok || !resJson.success) {
-        throw new Error(resJson.error || "Không thể phân tích dữ liệu lịch trình");
-      }
-
-      toast.success("Trích xuất lịch trình thành công bằng Gemini AI!", {
-        id: toastId,
-      });
-
-      onParsedSuccess(resJson.data);
     } catch (err: any) {
       console.error(err);
-      toast.error(err.message || "Lỗi khi xử lý file", { id: toastId });
+      toast.error(err.message || "Lỗi khi xử lý lịch trình", { id: toastId });
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handlePasteClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        setGdocUrl(text);
+        toast.info("Đã dán liên kết từ bộ nhớ tạm");
+      }
+    } catch {
+      toast.error("Không thể tự động dán. Vui lòng nhấn Ctrl+V / Cmd+V");
     }
   };
 
@@ -107,41 +152,101 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
           <span>AI Trích xuất Lịch trình Tự động</span>
         </div>
         <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-          Nhập Lịch Trình Du Lịch Trung Quốc
+          Nhập Lịch Trình Du Lịch
         </h2>
         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2">
-          Kéo thả file Word (.docx), Markdown hoặc dán text. Gemini AI sẽ tự động phân tích thành phố, khách sạn, tên tiếng Trung, toạ độ Amap và món ăn đặc sản.
+          Hỗ trợ đọc từ Google Docs (tự động đồng bộ khi sửa), tải file Word (.docx), hoặc dán văn bản trực tiếp.
         </p>
       </div>
 
       {/* Tabs */}
-      <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl max-w-xs mx-auto mb-5">
+      <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl max-w-md mx-auto mb-5 overflow-x-auto">
+        <button
+          type="button"
+          onClick={() => setActiveTab("gdoc")}
+          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center justify-center gap-1.5 ${
+            activeTab === "gdoc"
+              ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+          }`}
+        >
+          <Link2 className="w-3.5 h-3.5" />
+          <span>Google Docs / Sync</span>
+        </button>
+
         <button
           type="button"
           onClick={() => setActiveTab("file")}
-          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all ${
+          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center justify-center gap-1.5 ${
             activeTab === "file"
               ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs"
               : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
           }`}
         >
-          Tải file (.docx, .txt, .md)
+          <UploadCloud className="w-3.5 h-3.5" />
+          <span>File Word (.docx)</span>
         </button>
+
         <button
           type="button"
           onClick={() => setActiveTab("text")}
-          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all ${
+          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center justify-center gap-1.5 ${
             activeTab === "text"
               ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs"
               : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
           }`}
         >
-          Dán nội dung trực tiếp
+          <FileText className="w-3.5 h-3.5" />
+          <span>Dán văn bản</span>
         </button>
       </div>
 
+      {/* Google Docs Tab */}
+      {activeTab === "gdoc" && (
+        <div className="space-y-4">
+          <div className="bg-blue-50/60 dark:bg-blue-950/20 p-4 rounded-2xl border border-blue-200/60 dark:border-blue-900/40">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
+                <Link2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                Dán đường dẫn liên kết Google Docs của bạn:
+              </span>
+              <button
+                type="button"
+                onClick={handlePasteClipboard}
+                className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+              >
+                Dán từ Clipboard
+              </button>
+            </div>
+
+            <input
+              type="url"
+              value={gdocUrl}
+              onChange={(e) => setGdocUrl(e.target.value)}
+              placeholder="https://docs.google.com/document/d/.../edit"
+              className="w-full rounded-xl border border-blue-300 dark:border-blue-800 bg-white dark:bg-slate-900 p-3 text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+            />
+
+            <div className="mt-3 text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed space-y-1">
+              <p className="flex items-start gap-1.5">
+                <span className="text-blue-600 font-bold shrink-0">&bull;</span>
+                <span>
+                  <strong>Lưu ý quyền xem:</strong> Trên Google Docs, bấm <strong>Chia sẻ (Share)</strong> -&gt; chọn <strong>Bất kỳ ai có đường liên kết đều có thể xem (Anyone with the link can view)</strong>.
+                </span>
+              </p>
+              <p className="flex items-start gap-1.5">
+                <span className="text-emerald-600 font-bold shrink-0">&bull;</span>
+                <span>
+                  <strong>Tính năng Đồng Bộ (Live Sync):</strong> Ứng dụng sẽ lưu liên kết này. Khi bạn sửa Google Docs, chỉ cần bấm nút <strong>"Đồng bộ Google Docs"</strong> trên app là lịch trình tự động cập nhật lại!
+                </span>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* File Dropzone Area */}
-      {activeTab === "file" ? (
+      {activeTab === "file" && (
         <div
           onDragEnter={handleDrag}
           onDragLeave={handleDrag}
@@ -181,7 +286,10 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
           ) : (
             <div className="space-y-1.5">
               <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                Kéo thả file vào đây hoặc <span className="text-amber-600 dark:text-amber-400 underline">chọn từ thiết bị</span>
+                Kéo thả file vào đây hoặc{" "}
+                <span className="text-amber-600 dark:text-amber-400 underline">
+                  chọn từ thiết bị
+                </span>
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Hỗ trợ Microsoft Word (.docx), Text (.txt), Markdown (.md)
@@ -189,8 +297,10 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
             </div>
           )}
         </div>
-      ) : (
-        /* Text Paste Area */
+      )}
+
+      {/* Text Paste Area */}
+      {activeTab === "text" && (
         <div className="space-y-2">
           <textarea
             value={textInput}
@@ -214,6 +324,11 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
             <>
               <Loader2 className="w-4 h-4 animate-spin text-slate-900" />
               <span>Đang phân tích cấu trúc bằng Gemini AI...</span>
+            </>
+          ) : activeTab === "gdoc" ? (
+            <>
+              <RefreshCw className="w-4 h-4" />
+              <span>Đọc &amp; Phân Tích từ Google Docs</span>
             </>
           ) : (
             <>

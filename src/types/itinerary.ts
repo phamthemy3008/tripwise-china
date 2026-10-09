@@ -39,4 +39,7 @@ export interface TripDocument {
   duration: string;
   created_at: number;
   days: DayPlan[];
+  source_doc_url?: string;
+  source_doc_id?: string;
+  last_synced_at?: number;
 }

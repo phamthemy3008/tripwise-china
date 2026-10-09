@@ -79,6 +79,176 @@ app.post(
   }
 );
 
+// Helper to extract Google Doc ID from URL
+function extractGoogleDocId(input: string): string | null {
+  const match = input.match(/\/document\/d\/([a-zA-Z0-9-_]+)/);
+  if (match) return match[1];
+  if (/^[a-zA-Z0-9-_]{20,}$/.test(input.trim())) return input.trim();
+  return null;
+}
+
+// API: Parse from Google Docs Link / ID
+app.post("/api/fetch-google-doc", async (req: Request, res: Response) => {
+  try {
+    const { url, accessToken } = req.body;
+    if (!url) {
+      res.status(400).json({ error: "Vui lòng cung cấp liên kết Google Docs." });
+      return;
+    }
+
+    const docId = extractGoogleDocId(url);
+    if (!docId) {
+      res.status(400).json({
+        error: "Định dạng liên kết Google Docs không hợp lệ. Ví dụ: https://docs.google.com/document/d/.../edit",
+      });
+      return;
+    }
+
+    let extractedText = "";
+
+    // 1. If accessToken is provided, try Google Docs API
+    if (accessToken) {
+      try {
+        const apiRes = await fetch(
+          `https://docs.googleapis.com/v1/documents/${docId}`,
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          }
+        );
+        if (apiRes.ok) {
+          const docData = await apiRes.json();
+          // Extract structural text from Google Docs JSON
+          const content = docData.body?.content || [];
+          extractedText = content
+            .map((c: any) =>
+              c.paragraph?.elements
+                ?.map((e: any) => e.textRun?.content || "")
+                .join("") || ""
+            )
+            .join("\n");
+        }
+      } catch (e) {
+        console.warn("Google Docs API fetch error, falling back to export endpoint:", e);
+      }
+    }
+
+    // 2. Fallback / Public Export endpoint
+    if (!extractedText.trim()) {
+      const exportUrl = `https://docs.google.com/document/d/${docId}/export?format=txt`;
+      const exportRes = await fetch(exportUrl, {
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      });
+
+      if (!exportRes.ok) {
+        res.status(400).json({
+          error:
+            "Không thể đọc tài liệu Google Docs này. Hãy đảm bảo tài liệu được bật chế độ chia sẻ: 'Bất kỳ ai có đường liên kết đều có thể xem' (Anyone with the link can view).",
+        });
+        return;
+      }
+
+      extractedText = await exportRes.text();
+    }
+
+    if (!extractedText.trim() || extractedText.includes("<!DOCTYPE html>")) {
+      res.status(400).json({
+        error:
+          "Nội dung Google Docs trống hoặc tài liệu yêu cầu quyền truy cập. Hãy bật quyền xem liên kết trên Google Docs.",
+      });
+      return;
+    }
+
+    // Process with Gemini 2.5 Flash
+    const structuredItinerary = await parseTripWithGemini(extractedText);
+    structuredItinerary.source_doc_url = url;
+    structuredItinerary.source_doc_id = docId;
+    structuredItinerary.last_synced_at = Date.now();
+
+    res.json({
+      success: true,
+      data: structuredItinerary,
+    });
+  } catch (error: any) {
+    console.error("Fetch Google Doc Error:", error);
+    res.status(500).json({
+      error: error.message || "Lỗi khi đọc và phân tích Google Docs",
+    });
+  }
+});
+
+// API: Re-sync existing trip from its Google Doc
+app.post("/api/sync-google-doc", async (req: Request, res: Response) => {
+  try {
+    const { docUrl, tripId, accessToken } = req.body;
+    if (!docUrl) {
+      res.status(400).json({ error: "Không tìm thấy liên kết Google Docs nguồn." });
+      return;
+    }
+
+    const docId = extractGoogleDocId(docUrl);
+    if (!docId) {
+      res.status(400).json({ error: "ID tài liệu Google Docs không hợp lệ." });
+      return;
+    }
+
+    let extractedText = "";
+
+    // Try Docs API if accessToken provided
+    if (accessToken) {
+      try {
+        const apiRes = await fetch(
+          `https://docs.googleapis.com/v1/documents/${docId}`,
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          }
+        );
+        if (apiRes.ok) {
+          const docData = await apiRes.json();
+          extractedText = (docData.body?.content || [])
+            .map((c: any) =>
+              c.paragraph?.elements
+                ?.map((e: any) => e.textRun?.content || "")
+                .join("") || ""
+            )
+            .join("\n");
+        }
+      } catch (e) {
+        console.warn("Docs API sync fallback:", e);
+      }
+    }
+
+    if (!extractedText.trim()) {
+      const exportUrl = `https://docs.google.com/document/d/${docId}/export?format=txt`;
+      const exportRes = await fetch(exportUrl, {
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      });
+      if (!exportRes.ok) {
+        res.status(400).json({
+          error: "Không thể kết nối đến Google Docs. Vui lòng kiểm tra quyền chia sẻ.",
+        });
+        return;
+      }
+      extractedText = await exportRes.text();
+    }
+
+    const updated = await parseTripWithGemini(extractedText);
+    if (tripId) updated.id = tripId;
+    updated.source_doc_url = docUrl;
+    updated.source_doc_id = docId;
+    updated.last_synced_at = Date.now();
+
+    res.json({
+      success: true,
+      data: updated,
+    });
+  } catch (error: any) {
+    console.error("Sync Google Doc Error:", error);
+    res.status(500).json({
+      error: error.message || "Lỗi đồng bộ Google Docs",
+    });
+  }
+});
+
 // API: CRUD Trips
 app.get("/api/trips", (_req: Request, res: Response) => {
   res.json({ success: true, data: serverTrips });

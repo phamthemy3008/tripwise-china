@@ -35,6 +35,9 @@ import {
   LogOut,
   User,
   Loader2,
+  RefreshCw,
+  Link2,
+  ExternalLink,
 } from "lucide-react";
 
 function MainApp() {
@@ -47,6 +50,7 @@ function MainApp() {
   const [isSurvivalGuideOpen, setIsSurvivalGuideOpen] = useState<boolean>(false);
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [isLoadingTrips, setIsLoadingTrips] = useState<boolean>(true);
+  const [isSyncingGoogleDoc, setIsSyncingGoogleDoc] = useState<boolean>(false);
 
   // Load user-specific trips whenever user changes
   useEffect(() => {
@@ -187,6 +191,36 @@ function MainApp() {
       .catch(() => {
         toast.error("Không thể sao chép");
       });
+  };
+
+  const handleSyncGoogleDoc = async () => {
+    if (!currentTrip?.source_doc_url || !user) return;
+    setIsSyncingGoogleDoc(true);
+    const toastId = toast.loading("Đang đồng bộ nội dung mới nhất từ Google Docs...");
+    try {
+      const response = await fetch("/api/sync-google-doc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          docUrl: currentTrip.source_doc_url,
+          tripId: currentTrip.id,
+        }),
+      });
+      const resJson = await response.json();
+      if (!response.ok || !resJson.success) {
+        throw new Error(resJson.error || "Không thể đồng bộ Google Docs");
+      }
+      const updated = await saveUserTrip(user.uid, resJson.data);
+      setTrips(updated);
+      toast.success("Đồng bộ Google Docs thành công! Lịch trình đã được cập nhật.", {
+        id: toastId,
+      });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Lỗi khi đồng bộ Google Docs", { id: toastId });
+    } finally {
+      setIsSyncingGoogleDoc(false);
+    }
   };
 
   return (
@@ -344,6 +378,46 @@ function MainApp() {
                   </button>
                 </div>
               </div>
+
+              {/* Google Docs Source & Live Sync Bar */}
+              {currentTrip.source_doc_url && (
+                <div className="mt-3 pt-3 border-t border-slate-700/60 flex items-center justify-between gap-3 flex-wrap no-print">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/30 font-semibold">
+                      <Link2 className="w-3.5 h-3.5 text-blue-400" />
+                      Nguồn: Google Docs
+                    </span>
+                    {currentTrip.last_synced_at && (
+                      <span className="text-[11px] text-slate-400 hidden sm:inline">
+                        Đã đồng bộ: {new Date(currentTrip.last_synced_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={currentTrip.source_doc_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition-colors"
+                    >
+                      <ExternalLink className="w-3 h-3 text-slate-400" />
+                      <span>Mở Google Doc</span>
+                    </a>
+
+                    <button
+                      type="button"
+                      disabled={isSyncingGoogleDoc}
+                      onClick={handleSyncGoogleDoc}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+                      title="Tải lại nội dung mới nhất từ Google Docs"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isSyncingGoogleDoc ? "animate-spin" : ""}`} />
+                      <span>{isSyncingGoogleDoc ? "Đang đồng bộ..." : "Đồng bộ từ Google Doc"}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Sticky Day Tabs Navigation */}
