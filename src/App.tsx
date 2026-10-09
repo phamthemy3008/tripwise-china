@@ -801,7 +801,12 @@ function MainApp() {
 
                   <div className="space-y-1">
                     {activeDayPlan.events.map((event, idx) => (
-                      <TimelineCard key={idx} event={event} index={idx} />
+                      <TimelineCard
+                        key={idx}
+                        event={event}
+                        index={idx}
+                        cityName={activeDayPlan.city}
+                      />
                     ))}
                   </div>
 

@@ -4,7 +4,7 @@ import mammoth from "mammoth";
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
-import { parseTripWithGemini, suggestActivities } from "./src/lib/gemini.js";
+import { parseTripWithGemini, suggestActivities, suggestRestaurants } from "./src/lib/gemini.js";
 import { SAMPLE_TRIPS } from "./src/data/sampleTrips.js";
 
 dotenv.config();
@@ -598,6 +598,27 @@ app.post("/api/suggest-activities", async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Suggest activities error:", error);
     res.status(500).json({ error: error.message || "Lỗi khi gợi ý địa điểm" });
+  }
+});
+
+// API: Suggest restaurants for dish / place / city
+app.post("/api/suggest-restaurants", async (req: Request, res: Response) => {
+  try {
+    const { dishName, dishZh, city, placeName } = req.body;
+    if (!city && !dishName && !placeName) {
+      res.status(400).json({ error: "Thiếu thông tin thành phố hoặc món ăn." });
+      return;
+    }
+    const restaurants = await suggestRestaurants({
+      dishName,
+      dishZh,
+      city: city || "Trung Quốc",
+      placeName,
+    });
+    res.json({ success: true, data: restaurants });
+  } catch (error: any) {
+    console.error("Suggest restaurants error:", error);
+    res.status(500).json({ error: error.message || "Lỗi khi gợi ý quán ăn" });
   }
 });
 

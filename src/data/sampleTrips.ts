@@ -36,7 +36,17 @@ export const SAMPLE_TRIPS: TripDocument[] = [
                 dish_name_vn: "Mì bắp bò cay Hồ Nam (Tiệm Mì Bò Hùng Ký)",
                 dish_name_zh: "熊记牛肉面馆 牛肉面",
                 google_img_keyword: "湖南牛肉面",
-                baidu_img_keyword: "湖南特色牛肉面"
+                baidu_img_keyword: "湖南特色牛肉面",
+                restaurant: {
+                  name_vn: "Tiệm Mì Bò Hùng Ký (Gần Atour Hotel)",
+                  name_zh: "熊记牛肉面馆",
+                  address_hint: "Số 68 đường Tử Ngọ, quận Vĩnh Định, Trương Gia Giới",
+                  amap_query: "熊记牛肉面馆 张家界",
+                  price_range: "~20 - 35 ¥/bát",
+                  rating: "4.7★ (Dianping)",
+                  recommended_dish: "Mì bắp bò hầm hoa tiêu Hồ Nam & Trứng ngâm trà",
+                  note: "Nước dùng xương hầm 12 tiếng cay nồng ấm bụng, mở từ sáng sớm."
+                }
               },
               {
                 dish_name_vn: "Bún gạo xào chua cay",
@@ -74,7 +84,17 @@ export const SAMPLE_TRIPS: TripDocument[] = [
                 dish_name_vn: "Lẩu xào khô Tam Hạ Oa (Hồ Sư Phụ)",
                 dish_name_zh: "胡师傅三下锅",
                 google_img_keyword: "张家界三下锅",
-                baidu_img_keyword: "张家界胡师傅三下锅"
+                baidu_img_keyword: "张家界胡师傅三下锅",
+                restaurant: {
+                  name_vn: "Hồ Sư Phụ Tam Hạ Oa (Chi nhánh Phố Cổ)",
+                  name_zh: "胡师傅三下锅 (大庸桥店)",
+                  address_hint: "Số 117 đường Tử Ngọ, quận Vũ Lăng Nguyên / Vĩnh Định",
+                  amap_query: "胡师傅三下锅",
+                  price_range: "~55 - 80 ¥/người",
+                  rating: "4.8★ (Đệ nhất Tam Hạ Oa)",
+                  recommended_dish: "Tam Hạ Oa xào khô (ruột heo giòn, ba chỉ hun khói, nấm rừng)",
+                  note: "Quán thương hiệu lâu năm đông khách nhất vùng, nên đi sớm trước 18h."
+                }
               },
               {
                 dish_name_vn: "Đậu phụ sốt cay Thổ Gia",
@@ -137,7 +157,17 @@ export const SAMPLE_TRIPS: TripDocument[] = [
                 dish_name_vn: "Vịt hầm hạt dẻ rừng Tương Tây",
                 dish_name_zh: "板栗炖鸭",
                 google_img_keyword: "湘西板栗炖鸭",
-                baidu_img_keyword: "板栗炖鸭 湘西"
+                baidu_img_keyword: "板栗炖鸭 湘西",
+                restaurant: {
+                  name_vn: "Ngân Mãn Đẩu Thổ Thái Quán",
+                  name_zh: "银满斗土菜馆",
+                  address_hint: "Hẻm Thương Nghiệp, đường Thập Tự Nhai, quận Vĩnh Định",
+                  amap_query: "银满斗土菜馆",
+                  price_range: "~45 - 70 ¥/người",
+                  rating: "4.7★ (Đặc sản Tương Tây)",
+                  recommended_dish: "Vịt hầm hạt dẻ rừng bùi béo & Cá suối sốt chua ngọt",
+                  note: "Quán gia truyền phong cách nhà gỗ Thổ Gia ấm cúng, đậm đà vị núi rừng."
+                }
               },
               {
                 dish_name_vn: "Cá suối om canh chua người Miêu",
@@ -371,7 +401,17 @@ export const SAMPLE_TRIPS: TripDocument[] = [
                 dish_name_vn: "Miến chua cay Trùng Khánh (Hảo Hữu Lai)",
                 dish_name_zh: "好又来酸辣粉",
                 google_img_keyword: "重庆好又来酸辣粉",
-                baidu_img_keyword: "好又来酸辣粉"
+                baidu_img_keyword: "好又来酸辣粉",
+                restaurant: {
+                  name_vn: "Miến Tiêu Cay Hảo Hữu Lai (Phố Bát Nhất)",
+                  name_zh: "好又来酸辣粉 (八一路店)",
+                  address_hint: "Số 28 phố ẩm thực Bát Nhất, Giải Phóng Bi, quận Du Trung",
+                  amap_query: "好又来酸辣粉 八一路",
+                  price_range: "~15 - 25 ¥/bát",
+                  rating: "4.8★ (Huyền thoại ăn vặt Trùng Khánh)",
+                  recommended_dish: "Miến chua cay tương đậu thịt bằm & Bánh nếp giòn",
+                  note: "Quán xếp hàng đông nhưng phục vụ siêu nhanh, sợi miến dẻo dai chua cay bùng nổ."
+                }
               },
               {
                 dish_name_vn: "Thạch đá băng phấn đường nâu",
@@ -410,7 +450,17 @@ export const SAMPLE_TRIPS: TripDocument[] = [
                 dish_name_vn: "Mao Huyết Vượng (Mậu Trang Cổ Trấn)",
                 dish_name_zh: "茂庄古镇第一家毛血旺",
                 google_img_keyword: "重庆毛血旺",
-                baidu_img_keyword: "磁器口毛血旺"
+                baidu_img_keyword: "磁器口毛血旺",
+                restaurant: {
+                  name_vn: "Mậu Trang Cổ Trấn Đệ Nhất Quán (Từ Khí Khẩu)",
+                  name_zh: "茂庄古镇第一家毛血旺 (总店)",
+                  address_hint: "Số 74 đường Chính Phố Cổ Từ Khí Khẩu, quận Sa Bình Bá",
+                  amap_query: "茂庄古镇第一家毛血旺 磁器口",
+                  price_range: "~45 - 75 ¥/người",
+                  rating: "4.8★ (Đặc sản Từ Khí Khẩu)",
+                  recommended_dish: "Thố lớn Mao Huyết Vượng (tiết vịt, lòng non, giăm bông, lươn)",
+                  note: "Món ăn cay tê đỏ rực chuẩn vị Trùng Khánh cổ điển, cực kỳ tốn cơm trắng."
+                }
               }
             ]
           },
@@ -441,7 +491,17 @@ export const SAMPLE_TRIPS: TripDocument[] = [
                 dish_name_vn: "Lẩu cay mỡ bò Trùng Khánh (Lẩu Bội Tỷ / Chu Sư Huynh)",
                 dish_name_zh: "佩姐老火锅 / 周师兄老火锅",
                 google_img_keyword: "重庆老火锅 九宫格",
-                baidu_img_keyword: "重庆佩姐老火锅"
+                baidu_img_keyword: "重庆佩姐老火锅",
+                restaurant: {
+                  name_vn: "Lẩu Chu Sư Huynh Cửu Cung Cách (Gần Hồng Nhai Động)",
+                  name_zh: "周师兄重庆老火锅 (解放碑/洪崖洞店)",
+                  address_hint: "Tầng 3, Minzu Road Plaza, cạnh phố đi bộ Giải Phóng Bi",
+                  amap_query: "周师兄火锅 解放碑",
+                  price_range: "~85 - 120 ¥/người",
+                  rating: "4.9★ (Di sản phi vật thể ẩm thực)",
+                  recommended_dish: "Nồi lẩu 9 ô (ngưu bách diệp giòn, thăn bò ớt tươi, tôm nghiền nấm)",
+                  note: "Nước dùng mỡ bò nguyên chất nấu thảo dược, phục vụ trà hoa cúc giải cay mát gan."
+                }
               }
             ]
           }
@@ -474,7 +534,17 @@ export const SAMPLE_TRIPS: TripDocument[] = [
                 dish_name_vn: "Mì Tiểu Diện Trùng Khánh (Bàn Muội Diện Trang - Michelin Bib)",
                 dish_name_zh: "胖妹面庄 重庆小面",
                 google_img_keyword: "重庆小面 胖妹面庄",
-                baidu_img_keyword: "胖妹面庄 重庆小面"
+                baidu_img_keyword: "胖妹面庄 重庆小面",
+                restaurant: {
+                  name_vn: "Bàn Muội Diện Trang (Michelin Bib Gourmand)",
+                  name_zh: "胖妹面庄 (两路口总店)",
+                  address_hint: "Số 139 đường Trung Sơn Tam Lộ, Lưỡng Lộ Khẩu, quận Du Trung",
+                  amap_query: "胖妹面庄 两路口",
+                  price_range: "~18 - 30 ¥/bát",
+                  rating: "4.8★ (Michelin Guide gợi ý)",
+                  recommended_dish: "Mì thịt bò hầm tương & Mì lòng non cay tê béo ngậy",
+                  note: "Quán mì nổi tiếng hàng chục năm, sợi mì ngập trong dầu ớt thơm cay đậm đà."
+                }
               }
             ]
           },
@@ -690,7 +760,17 @@ export const SAMPLE_TRIPS: TripDocument[] = [
                 dish_name_vn: "Đậu phụ Ma Bà chuẩn vị gốc (Trần Ma Bà)",
                 dish_name_zh: "陈麻婆豆腐",
                 google_img_keyword: "陈麻婆豆腐",
-                baidu_img_keyword: "正宗陈麻婆豆腐"
+                baidu_img_keyword: "正宗陈麻婆豆腐",
+                restaurant: {
+                  name_vn: "Trần Ma Bà Đậu Phụ (Cơ sở旗舰店 / Lâu năm từ 1862)",
+                  name_zh: "陈麻婆豆腐 (旗舰店)",
+                  address_hint: "Số 197 đường Thanh Hoa, quận Thanh Dương, Thành Đô",
+                  amap_query: "陈麻婆豆腐旗舰店",
+                  price_range: "~50 - 80 ¥/người",
+                  rating: "4.8★ (Thủy tổ Đậu phụ Tứ Xuyên)",
+                  recommended_dish: "Đậu phụ Ma Bà tê cay nồng & Thịt bò lát mỏng luộc cay (Thủy Chử Ngưu Nhục)",
+                  note: "Món đậu hũ mướt mịn cay tê từ tiêu Hán Nguyên và sốt tương Pixian trứ danh."
+                }
               },
               {
                 dish_name_vn: "Gà xào hạt đậu phộng Cung Bảo",

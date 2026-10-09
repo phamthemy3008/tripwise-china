@@ -19,9 +19,10 @@ import {
 interface TimelineCardProps {
   event: ActivityEvent;
   index: number;
+  cityName?: string;
 }
 
-export const TimelineCard: React.FC<TimelineCardProps> = ({ event, index }) => {
+export const TimelineCard: React.FC<TimelineCardProps> = ({ event, index, cityName }) => {
   const [isCheckedIn, setIsCheckedIn] = useState<boolean>(false);
 
   const getSlotIcon = (slot: string) => {
@@ -189,7 +190,12 @@ export const TimelineCard: React.FC<TimelineCardProps> = ({ event, index }) => {
 
         {/* Food Section (Dish Explorer) */}
         {event.dishes && event.dishes.length > 0 && (
-          <DishExplorer dishes={event.dishes} />
+          <DishExplorer
+            dishes={event.dishes}
+            cityName={cityName}
+            placeName={event.place_name}
+            placeZh={event.place_zh}
+          />
         )}
 
         {/* Travel Tips / Notes */}

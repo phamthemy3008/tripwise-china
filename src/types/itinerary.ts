@@ -1,8 +1,26 @@
+export interface RestaurantRecommendation {
+  name_vn: string;
+  name_zh: string;
+  address_hint?: string;
+  amap_query?: string;
+  price_range?: string;
+  recommended_dish?: string;
+  note?: string;
+  specialty_note?: string;
+  rating?: string;
+}
+
 export interface DishItem {
   dish_name_vn: string;
   dish_name_zh: string;
   google_img_keyword?: string;
   baidu_img_keyword?: string;
+  restaurant?: RestaurantRecommendation;
+  restaurant_name?: string;
+  restaurant_zh?: string;
+  restaurant_address?: string;
+  price_range?: string;
+  restaurant_note?: string;
 }
 
 export interface ActivityEvent {
