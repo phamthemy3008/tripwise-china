@@ -87,6 +87,102 @@ function extractGoogleDocId(input: string): string | null {
   return null;
 }
 
+// Helper to extract 100% of text from Google Docs JSON including tables, rows, cells, and paragraphs
+function extractAllTextFromGoogleDoc(docData: any): string {
+  if (!docData?.body?.content) return "";
+  let fullText = "";
+
+  function walk(elements: any[]) {
+    for (const el of elements) {
+      if (el.paragraph?.elements) {
+        for (const pe of el.paragraph.elements) {
+          if (pe.textRun?.content) {
+            fullText += pe.textRun.content;
+          }
+        }
+      } else if (el.table?.tableRows) {
+        for (const row of el.table.tableRows) {
+          const cells: string[] = [];
+          for (const cell of row.tableCells || []) {
+            if (cell.content) {
+              const start = fullText.length;
+              walk(cell.content);
+              const cellText = fullText.substring(start).trim();
+              fullText = fullText.substring(0, start);
+              if (cellText) cells.push(cellText);
+            }
+          }
+          if (cells.length > 0) {
+            fullText += cells.join(" | ") + "\n";
+          }
+        }
+      } else if (el.tableOfContents?.content) {
+        walk(el.tableOfContents.content);
+      }
+    }
+  }
+
+  walk(docData.body.content);
+  return fullText;
+}
+
+// Fetch Google Docs text with maximum fidelity (docx export with mammoth > Docs API > txt export)
+async function fetchGoogleDocContent(docId: string, accessToken?: string): Promise<string> {
+  // Strategy 1: Export as .docx & parse with mammoth (Captures 100% of tables, lists & columns!)
+  try {
+    const exportDocxUrl = `https://docs.google.com/document/d/${docId}/export?format=docx`;
+    const docxRes = await fetch(exportDocxUrl, {
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    });
+    if (docxRes.ok) {
+      const arrayBuffer = await docxRes.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const mammothResult = await mammoth.extractRawText({ buffer });
+      if (mammothResult.value && mammothResult.value.trim().length > 30) {
+        return mammothResult.value;
+      }
+    }
+  } catch (err) {
+    console.warn("Google Docs docx export fallback:", err);
+  }
+
+  // Strategy 2: Google Docs API (if accessToken available) with recursive table/cell walker
+  if (accessToken) {
+    try {
+      const apiRes = await fetch(`https://docs.googleapis.com/v1/documents/${docId}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (apiRes.ok) {
+        const docData = await apiRes.json();
+        const apiText = extractAllTextFromGoogleDoc(docData);
+        if (apiText && apiText.trim().length > 30) {
+          return apiText;
+        }
+      }
+    } catch (err) {
+      console.warn("Google Docs API fallback:", err);
+    }
+  }
+
+  // Strategy 3: Export as .txt
+  try {
+    const exportTxtUrl = `https://docs.google.com/document/d/${docId}/export?format=txt`;
+    const txtRes = await fetch(exportTxtUrl, {
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    });
+    if (txtRes.ok) {
+      const txt = await txtRes.text();
+      if (txt && !txt.includes("<!DOCTYPE html>") && txt.trim().length > 20) {
+        return txt;
+      }
+    }
+  } catch (err) {
+    console.warn("Google Docs txt export fallback:", err);
+  }
+
+  return "";
+}
+
 // API: Parse from Google Docs Link / ID
 app.post("/api/fetch-google-doc", async (req: Request, res: Response) => {
   try {
@@ -104,61 +200,16 @@ app.post("/api/fetch-google-doc", async (req: Request, res: Response) => {
       return;
     }
 
-    let extractedText = "";
-
-    // 1. If accessToken is provided, try Google Docs API
-    if (accessToken) {
-      try {
-        const apiRes = await fetch(
-          `https://docs.googleapis.com/v1/documents/${docId}`,
-          {
-            headers: { Authorization: `Bearer ${accessToken}` },
-          }
-        );
-        if (apiRes.ok) {
-          const docData = await apiRes.json();
-          // Extract structural text from Google Docs JSON
-          const content = docData.body?.content || [];
-          extractedText = content
-            .map((c: any) =>
-              c.paragraph?.elements
-                ?.map((e: any) => e.textRun?.content || "")
-                .join("") || ""
-            )
-            .join("\n");
-        }
-      } catch (e) {
-        console.warn("Google Docs API fetch error, falling back to export endpoint:", e);
-      }
-    }
-
-    // 2. Fallback / Public Export endpoint
+    const extractedText = await fetchGoogleDocContent(docId, accessToken);
     if (!extractedText.trim()) {
-      const exportUrl = `https://docs.google.com/document/d/${docId}/export?format=txt`;
-      const exportRes = await fetch(exportUrl, {
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
-      });
-
-      if (!exportRes.ok) {
-        res.status(400).json({
-          error:
-            "Không thể đọc tài liệu Google Docs này. Hãy đảm bảo tài liệu được bật chế độ chia sẻ: 'Bất kỳ ai có đường liên kết đều có thể xem' (Anyone with the link can view).",
-        });
-        return;
-      }
-
-      extractedText = await exportRes.text();
-    }
-
-    if (!extractedText.trim() || extractedText.includes("<!DOCTYPE html>")) {
       res.status(400).json({
         error:
-          "Nội dung Google Docs trống hoặc tài liệu yêu cầu quyền truy cập. Hãy bật quyền xem liên kết trên Google Docs.",
+          "Không thể đọc tài liệu Google Docs này. Hãy đảm bảo tài liệu được bật quyền: 'Bất kỳ ai có đường liên kết đều có thể xem' (Anyone with the link can view).",
       });
       return;
     }
 
-    // Process with Gemini 2.5 Flash
+    // Process with Gemini with full fidelity
     const structuredItinerary = await parseTripWithGemini(extractedText);
     structuredItinerary.source_doc_url = url;
     structuredItinerary.source_doc_id = docId;
@@ -176,10 +227,10 @@ app.post("/api/fetch-google-doc", async (req: Request, res: Response) => {
   }
 });
 
-// API: Re-sync existing trip from its Google Doc
+// API: Re-sync existing trip from its Google Doc safely
 app.post("/api/sync-google-doc", async (req: Request, res: Response) => {
   try {
-    const { docUrl, tripId, accessToken } = req.body;
+    const { docUrl, tripId, existingTrip, accessToken } = req.body;
     if (!docUrl) {
       res.status(400).json({ error: "Không tìm thấy liên kết Google Docs nguồn." });
       return;
@@ -191,51 +242,39 @@ app.post("/api/sync-google-doc", async (req: Request, res: Response) => {
       return;
     }
 
-    let extractedText = "";
-
-    // Try Docs API if accessToken provided
-    if (accessToken) {
-      try {
-        const apiRes = await fetch(
-          `https://docs.googleapis.com/v1/documents/${docId}`,
-          {
-            headers: { Authorization: `Bearer ${accessToken}` },
-          }
-        );
-        if (apiRes.ok) {
-          const docData = await apiRes.json();
-          extractedText = (docData.body?.content || [])
-            .map((c: any) =>
-              c.paragraph?.elements
-                ?.map((e: any) => e.textRun?.content || "")
-                .join("") || ""
-            )
-            .join("\n");
-        }
-      } catch (e) {
-        console.warn("Docs API sync fallback:", e);
-      }
-    }
-
+    const extractedText = await fetchGoogleDocContent(docId, accessToken);
     if (!extractedText.trim()) {
-      const exportUrl = `https://docs.google.com/document/d/${docId}/export?format=txt`;
-      const exportRes = await fetch(exportUrl, {
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      res.status(400).json({
+        error: "Không thể kết nối đến Google Docs. Vui lòng kiểm tra quyền chia sẻ liên kết.",
       });
-      if (!exportRes.ok) {
-        res.status(400).json({
-          error: "Không thể kết nối đến Google Docs. Vui lòng kiểm tra quyền chia sẻ.",
-        });
-        return;
-      }
-      extractedText = await exportRes.text();
+      return;
     }
 
     const updated = await parseTripWithGemini(extractedText);
-    if (tripId) updated.id = tripId;
+    const targetTripId = tripId || existingTrip?.id;
+    if (targetTripId) updated.id = targetTripId;
+    if (existingTrip?.created_at) updated.created_at = existingTrip.created_at;
     updated.source_doc_url = docUrl;
     updated.source_doc_id = docId;
     updated.last_synced_at = Date.now();
+
+    // Preserve any custom user-added activities that are not in the new doc
+    if (existingTrip?.days && updated?.days) {
+      updated.days = updated.days.map((newDay) => {
+        const oldDay = existingTrip.days.find((d: any) => d.day_number === newDay.day_number);
+        if (!oldDay) return newDay;
+        const customEvents = (oldDay.events || []).filter((oldEvent: any) => {
+          return !newDay.events.some((ne: any) =>
+            ne.place_name?.toLowerCase() === oldEvent.place_name?.toLowerCase() ||
+            (ne.place_zh && ne.place_zh === oldEvent.place_zh)
+          );
+        });
+        return {
+          ...newDay,
+          events: [...newDay.events, ...customEvents],
+        };
+      });
+    }
 
     res.json({
       success: true,

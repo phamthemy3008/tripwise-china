@@ -20,13 +20,16 @@ export async function parseTripWithGemini(rawText: string): Promise<TripDocument
     throw new Error("GEMINI_API_KEY chưa được cấu hình trên máy chủ.");
   }
 
-  const prompt = `Bạn là trợ lý chuyên gia hoạch định lịch trình du lịch Trung Quốc thông minh. 
+  const prompt = `Bạn là trợ lý chuyên gia hoạch định lịch trình du lịch Trung Quốc thông minh và cực kỳ tỉ mỉ. 
 Nhiệm vụ của bạn là phân tích toàn bộ văn bản lịch trình du lịch sau đây và trích xuất thành định dạng JSON chuẩn xác theo cấu trúc schema.
-Lưu ý quan trọng cho du lịch Trung Quốc:
-1. Trích xuất chính xác tên tiếng Trung (place_zh, dish_name_zh, hotel.name_zh) để người dùng có thể sao chép 1 chạm và tài xế/người bản xứ hiểu được.
-2. Với place_zh và amap_query: Tạo từ khóa tiếng Trung chuẩn để tìm kiếm trên Amap (Bản đồ Cao Đức 高德地图).
-3. Với món ăn: Gợi ý các món đặc sản địa phương tương ứng với từng bữa hoặc thành phố đó, cung cấp từ khóa tìm ảnh tiếng Trung cho Baidu và Google Images.
-4. Phân chia rõ các mốc thời gian: Sáng, Chiều, Tối.
+
+QUY TẮC BẮT BUỘC VỀ ĐỘ CHI TIẾT & BẢO TOÀN DỮ LIỆU:
+1. TUYỆT ĐỐI KHÔNG TỰ Ý TÓM TẮT HAY BỎ SÓT BẤT KỲ ĐỊA ĐIỂM, HOẠT ĐỘNG HOẶC MỐC THỜI GIAN NÀO CÓ TRONG TÀI LIỆU GỐC!
+2. Mỗi điểm tham quan, mỗi chặng di chuyển, mỗi bữa ăn, hoặc mỗi hoạt động trong ngày PHẢI ĐƯỢC TÁCH THÀNH MỘT EVENT ĐỘC LẬP trong mảng events. Nếu một ngày có 5 đến 10 hoạt động, phải trích xuất ĐẦY ĐỦ cả 5 đến 10 event chi tiết!
+3. Trường description và tips: Giữ lại toàn bộ chi tiết hướng dẫn tham quan, giá vé vào cửa, giờ mở cửa, cách đi lại, lưu ý trang phục từ tài liệu gốc. Không được viết sơ sài một câu chung chung!
+4. Trích xuất chính xác tên chữ Hán (place_zh, dish_name_zh, hotel.name_zh) chuẩn chữ Hán giản thể Trung Quốc để người dùng copy 1 chạm cho tài xế/người bản xứ hoặc tra cứu Amap.
+5. Phân chia rõ mốc thời gian: Sáng, Trưa, Chiều, Tối kèm khung giờ chi tiết (time_range, ví dụ: 08:30 - 11:30).
+6. Khách sạn: Trích xuất đầy đủ tên khách sạn (name_vn và name_zh), địa chỉ và số điện thoại nếu có.
 
 Nội dung lịch trình gốc:
 ${rawText}`;

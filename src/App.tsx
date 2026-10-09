@@ -249,6 +249,7 @@ function MainApp() {
         body: JSON.stringify({
           docUrl: currentTrip.source_doc_url,
           tripId: currentTrip.id,
+          existingTrip: currentTrip,
         }),
       });
       const resJson = await response.json();
@@ -257,6 +258,9 @@ function MainApp() {
       }
       const updated = await saveUserTrip(user.uid, resJson.data);
       setTrips(updated);
+      if (resJson.data?.id) {
+        setCurrentTripId(resJson.data.id);
+      }
       toast.success("Đồng bộ Google Docs thành công! Lịch trình đã được cập nhật.", {
         id: toastId,
       });
