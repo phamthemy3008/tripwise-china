@@ -10,9 +10,9 @@ export async function parseTripWithGemini(rawText: string): Promise<TripDocument
     throw new Error("GEMINI_API_KEY chưa được cấu hình trên máy chủ.");
   }
 
-  // Model: gemini-2.5-flash as specified by user
+  // Model: gemini-3.8-flash (Latest supported model)
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
+    model: "gemini-3.8-flash",
     contents: `Bạn là trợ lý chuyên gia hoạch định lịch trình du lịch Trung Quốc thông minh. 
 Nhiệm vụ của bạn là phân tích toàn bộ văn bản lịch trình du lịch sau đây và trích xuất thành định dạng JSON chuẩn xác theo cấu trúc schema.
 Lưu ý quan trọng cho du lịch Trung Quốc:
