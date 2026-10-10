@@ -402,15 +402,32 @@ export const TransportGuide: React.FC<TransportGuideProps> = ({
               </div>
 
               {/* Metro Action Buttons */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
                 <button
                   type="button"
                   onClick={handleOpenMetroMan}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 px-3 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer"
-                  title="Mở trực tiếp ứng dụng MetroMan (Tự động sao chép tên ga chữ Hán)"
+                  className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer"
+                  title="Mở ứng dụng MetroMan (Đã tự động sao chép tên ga chữ Hán)"
                 >
                   <Smartphone className="w-3.5 h-3.5" />
-                  <span>Mở app MetroMan (Tra ga & Tuyến)</span>
+                  <span>Mở app MetroMan</span>
+                  <ExternalLink className="w-3 h-3 opacity-70 ml-auto" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    window.open(
+                      "https://map.amap.com/subway/index.html",
+                      "_blank",
+                      "noopener,noreferrer"
+                    )
+                  }
+                  className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 bg-sky-600 hover:bg-sky-700 active:scale-[0.98] text-white rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer"
+                  title="Mở bản đồ sơ đồ Tàu điện ngầm Subway Web tương tác"
+                >
+                  <Navigation className="w-3.5 h-3.5" />
+                  <span>Bản đồ Subway Web</span>
                   <ExternalLink className="w-3 h-3 opacity-70 ml-auto" />
                 </button>
 
@@ -422,10 +439,10 @@ export const TransportGuide: React.FC<TransportGuideProps> = ({
                       "copyStationForMetro"
                     )
                   }
-                  className="w-full flex items-center justify-center gap-2 py-2.5 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700/60 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                  className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700/60 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-semibold transition-all cursor-pointer"
                 >
                   <Copy className="w-3.5 h-3.5 text-blue-500" />
-                  <span>Copy ga chữ Hán: {parsed.metro.arrivalStationZh}</span>
+                  <span>Copy ga: {parsed.metro.arrivalStationZh}</span>
                 </button>
               </div>
             </div>
