@@ -7,6 +7,8 @@ import {
   getUserTrips,
   saveUserTrip,
   deleteUserTrip,
+  resetTripsToFullSample,
+  upgradeTripsWithFullSample,
 } from "./lib/firestoreTrips";
 import { SAMPLE_TRIPS } from "./data/sampleTrips";
 import { DayTabs, checkIsToday } from "./components/DayTabs";
@@ -47,18 +49,37 @@ import {
   AlertTriangle,
   ArrowLeft,
   Check,
+  RotateCcw,
 } from "lucide-react";
 
 function MainApp() {
   const { user, loading: authLoading, signOut, signInWithGoogle, googleAccessToken } = useAuth();
-  const [trips, setTrips] = useState<TripDocument[]>([]);
-  const [currentTripId, setCurrentTripId] = useState<string>("");
+  const [trips, setTrips] = useState<TripDocument[]>(() => {
+    if (typeof window !== "undefined") {
+      const cached = localStorage.getItem("tripwise_anonymous_trips");
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const { upgraded, hasChanges } = upgradeTripsWithFullSample(parsed);
+            if (hasChanges) {
+              localStorage.setItem("tripwise_anonymous_trips", JSON.stringify(upgraded));
+            }
+            return upgraded;
+          }
+        } catch {}
+      }
+    }
+    return SAMPLE_TRIPS;
+  });
+  const [currentTripId, setCurrentTripId] = useState<string>(SAMPLE_TRIPS[0]?.id || "");
   const [selectedDayNumber, setSelectedDayNumber] = useState<number>(1);
+  const [viewMode, setViewMode] = useState<"single" | "all">("single");
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
   const [isTripsDrawerOpen, setIsTripsDrawerOpen] = useState<boolean>(false);
   const [isSurvivalGuideOpen, setIsSurvivalGuideOpen] = useState<boolean>(false);
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
-  const [isLoadingTrips, setIsLoadingTrips] = useState<boolean>(true);
+  const [isLoadingTrips, setIsLoadingTrips] = useState<boolean>(false);
   const [isSyncingGoogleDoc, setIsSyncingGoogleDoc] = useState<boolean>(false);
   const [isSuggestModalOpen, setIsSuggestModalOpen] = useState<boolean>(false);
 
@@ -295,6 +316,20 @@ function MainApp() {
       setSelectedDayNumber(1);
       setIsImportModalOpen(false);
       toast.success(`Đã thêm lịch trình: ${sample.trip_title}`);
+    }
+  };
+
+  const handleResetAndClearCache = async () => {
+    try {
+      const freshTrips = await resetTripsToFullSample(user?.uid);
+      setTrips(freshTrips);
+      setCurrentTripId(freshTrips[0]?.id || "");
+      setSelectedDayNumber(1);
+      toast.success("Đã xóa cache & cập nhật đủ 16 ngày lịch trình!", {
+        description: "Lịch trình du lịch Trung Quốc 16 ngày 15 đêm đã được cập nhật bản chuẩn mới nhất.",
+      });
+    } catch {
+      toast.error("Lỗi khi làm mới cache. Vui lòng thử lại!");
     }
   };
 
@@ -740,126 +775,235 @@ function MainApp() {
               )}
             </div>
 
+            {/* Outdated Trip Warning Banner (if phone stored old 2-day version in cache) */}
+            {currentTrip.days.length < 16 && (
+              <div className="mb-4 p-3 sm:p-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-between gap-3 text-xs shadow-md">
+                <div className="flex items-center gap-2.5">
+                  <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 animate-pulse" />
+                  <div>
+                    <p className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
+                      Thiết bị đang lưu bản cache cũ ({currentTrip.days.length} ngày)
+                    </p>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                      Lịch trình chuẩn có đủ 16 ngày (14/11 – 29/11). Bấm để tải lại bản đầy đủ.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleResetAndClearCache}
+                  className="shrink-0 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Tải đủ 16 ngày</span>
+                </button>
+              </div>
+            )}
+
             {/* Sticky Day Tabs Navigation */}
             <DayTabs
               days={currentTrip.days}
               selectedDay={selectedDayNumber}
               todayDayNumber={detectedTodayNumber}
+              viewMode={viewMode}
+              onToggleViewMode={setViewMode}
+              onResetCache={handleResetAndClearCache}
               onSelectDay={(dayNum) => {
                 setSelectedDayNumber(dayNum);
+                if (viewMode === "all") {
+                  const targetEl = document.getElementById(`day-section-${dayNum}`);
+                  if (targetEl) {
+                    targetEl.scrollIntoView({ behavior: "smooth", block: "start" });
+                    return;
+                  }
+                }
                 window.scrollTo({ top: 120, behavior: "smooth" });
               }}
             />
 
-            {/* Day Detail View */}
-            {activeDayPlan && (
-              <div className="px-3 sm:px-4 pt-5">
-                {/* Active Day Header */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 shadow-xs border border-slate-200/80 dark:border-slate-800 mb-4">
-                  <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
-                    <span className="text-xs font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5" />
-                      {activeDayPlan.date || `Ngày ${activeDayPlan.day_number}`}
-                    </span>
-                    <span className="inline-flex items-center gap-1 text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-lg">
-                      <MapPin className="w-3.5 h-3.5 text-red-500" />
-                      {activeDayPlan.city}
-                    </span>
-                  </div>
-
-                  <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white leading-snug">
-                    {activeDayPlan.title}
-                  </h2>
-                </div>
-
-                {/* Real-time Weather Widget for active day's city */}
-                <WeatherWidget
-                  city={activeDayPlan.city}
-                  dayNumber={activeDayPlan.day_number}
-                  date={activeDayPlan.date}
-                />
-
-                {/* Hotel Card if hotel info is present */}
-                {activeDayPlan.hotel && <HotelCard hotel={activeDayPlan.hotel} />}
-
-                {/* Timeline Events Section */}
-                <div className="mt-6">
-                  <div className="flex items-center justify-between mb-4 px-1 flex-wrap gap-2">
-                    <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                      Lịch trình chi tiết trong ngày ({activeDayPlan.events.length} hoạt động)
-                    </h3>
-
-                    <button
-                      type="button"
-                      onClick={() => setIsSuggestModalOpen(true)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 text-xs font-black shadow-xs hover:brightness-105 transition-all cursor-pointer active:scale-95 no-print"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Gợi ý thêm điểm đến</span>
-                    </button>
-                  </div>
-
-                  <div className="space-y-1">
-                    {activeDayPlan.events.map((event, idx) => (
-                      <TimelineCard
-                        key={idx}
-                        event={event}
-                        index={idx}
-                        cityName={activeDayPlan.city}
-                        hotel={activeDayPlan.hotel}
-                        previousEvent={idx > 0 ? activeDayPlan.events[idx - 1] : undefined}
-                      />
-                    ))}
-                  </div>
-
-                  {/* Add more activity prompt banner at bottom */}
-                  <div className="mt-4 pt-1 no-print">
-                    <button
-                      type="button"
-                      onClick={() => setIsSuggestModalOpen(true)}
-                      className="w-full p-4 rounded-2xl border-2 border-dashed border-amber-300 dark:border-amber-700/60 bg-amber-50/50 dark:bg-amber-950/15 hover:bg-amber-100/60 dark:hover:bg-amber-950/30 text-amber-900 dark:text-amber-200 transition-all text-xs font-bold flex items-center justify-center gap-2 cursor-pointer group"
-                    >
-                      <Sparkles className="w-4 h-4 text-amber-500 group-hover:rotate-12 transition-transform" />
-                      <span>Bạn muốn khám phá thêm điểm nào tại <strong>{activeDayPlan.city}</strong>? Bấm để AI gợi ý!</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Day Navigation Buttons */}
-                <div className="flex items-center justify-between gap-3 pt-6 pb-8 border-t border-slate-200 dark:border-slate-800 mt-6 no-print">
-                  <button
-                    type="button"
-                    disabled={activeDayPlan.day_number <= 1}
-                    onClick={() => {
-                      setSelectedDayNumber((prev) => Math.max(1, prev - 1));
-                      window.scrollTo({ top: 120, behavior: "smooth" });
-                    }}
-                    className="flex-1 py-3 px-4 rounded-xl bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                    <span>Ngày trước</span>
-                  </button>
-
-                  <span className="text-xs font-mono font-bold text-slate-400">
-                    {activeDayPlan.day_number} / {currentTrip.days.length}
+            {/* View Mode: ALL DAYS CONTINUOUS VIEW (Cực kỳ tiện lợi trên iPhone / Mobile) */}
+            {viewMode === "all" ? (
+              <div className="px-3 sm:px-4 pt-5 space-y-10">
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-between text-xs text-amber-900 dark:text-amber-300">
+                  <span>
+                    Đang hiển thị <strong>toàn bộ {currentTrip.days.length} ngày</strong> lịch trình. Bấm thẻ ngày ở trên để nhảy nhanh đến ngày đó.
                   </span>
-
                   <button
                     type="button"
-                    disabled={activeDayPlan.day_number >= currentTrip.days.length}
-                    onClick={() => {
-                      setSelectedDayNumber((prev) =>
-                        Math.min(currentTrip.days.length, prev + 1)
-                      );
-                      window.scrollTo({ top: 120, behavior: "smooth" });
-                    }}
-                    className="flex-1 py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-amber-500 dark:hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-white dark:text-slate-950 text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+                    onClick={() => setViewMode("single")}
+                    className="font-bold underline text-amber-600 dark:text-amber-400 hover:text-amber-500 shrink-0 ml-2 cursor-pointer"
                   >
-                    <span>Ngày tiếp theo</span>
-                    <ChevronRight className="w-4 h-4" />
+                    Xem từng ngày
                   </button>
                 </div>
+
+                {currentTrip.days.map((dayPlan) => (
+                  <section
+                    key={dayPlan.day_number}
+                    id={`day-section-${dayPlan.day_number}`}
+                    className="scroll-mt-28 pb-8 border-b border-slate-200 dark:border-slate-800 last:border-b-0 space-y-4"
+                  >
+                    {/* Day Header */}
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 shadow-xs border border-slate-200/80 dark:border-slate-800">
+                      <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
+                        <span className="text-xs font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5" />
+                          Ngày {dayPlan.day_number}: {dayPlan.date || ""}
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-lg">
+                          <MapPin className="w-3.5 h-3.5 text-red-500" />
+                          {dayPlan.city}
+                        </span>
+                      </div>
+
+                      <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white leading-snug">
+                        {dayPlan.title}
+                      </h2>
+                    </div>
+
+                    {/* Weather & Hotel */}
+                    <WeatherWidget
+                      city={dayPlan.city}
+                      dayNumber={dayPlan.day_number}
+                      date={dayPlan.date}
+                    />
+                    {dayPlan.hotel && <HotelCard hotel={dayPlan.hotel} />}
+
+                    {/* Timeline Events Section */}
+                    <div>
+                      <div className="flex items-center justify-between mb-3 px-1">
+                        <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                          Lịch trình Ngày {dayPlan.day_number} ({dayPlan.events.length} hoạt động)
+                        </h3>
+                      </div>
+
+                      <div className="space-y-1">
+                        {dayPlan.events.map((event, idx) => (
+                          <TimelineCard
+                            key={idx}
+                            event={event}
+                            index={idx}
+                            cityName={dayPlan.city}
+                            hotel={dayPlan.hotel}
+                            previousEvent={idx > 0 ? dayPlan.events[idx - 1] : undefined}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </section>
+                ))}
               </div>
+            ) : (
+              /* View Mode: SINGLE ACTIVE DAY */
+              activeDayPlan && (
+                <div className="px-3 sm:px-4 pt-5">
+                  {/* Active Day Header */}
+                  <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 shadow-xs border border-slate-200/80 dark:border-slate-800 mb-4">
+                    <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
+                      <span className="text-xs font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5" />
+                        {activeDayPlan.date || `Ngày ${activeDayPlan.day_number}`}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-lg">
+                        <MapPin className="w-3.5 h-3.5 text-red-500" />
+                        {activeDayPlan.city}
+                      </span>
+                    </div>
+
+                    <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white leading-snug">
+                      {activeDayPlan.title}
+                    </h2>
+                  </div>
+
+                  {/* Real-time Weather Widget for active day's city */}
+                  <WeatherWidget
+                    city={activeDayPlan.city}
+                    dayNumber={activeDayPlan.day_number}
+                    date={activeDayPlan.date}
+                  />
+
+                  {/* Hotel Card if hotel info is present */}
+                  {activeDayPlan.hotel && <HotelCard hotel={activeDayPlan.hotel} />}
+
+                  {/* Timeline Events Section */}
+                  <div className="mt-6">
+                    <div className="flex items-center justify-between mb-4 px-1 flex-wrap gap-2">
+                      <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        Lịch trình chi tiết trong ngày ({activeDayPlan.events.length} hoạt động)
+                      </h3>
+
+                      <button
+                        type="button"
+                        onClick={() => setIsSuggestModalOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 text-xs font-black shadow-xs hover:brightness-105 transition-all cursor-pointer active:scale-95 no-print"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Gợi ý thêm điểm đến</span>
+                      </button>
+                    </div>
+
+                    <div className="space-y-1">
+                      {activeDayPlan.events.map((event, idx) => (
+                        <TimelineCard
+                          key={idx}
+                          event={event}
+                          index={idx}
+                          cityName={activeDayPlan.city}
+                          hotel={activeDayPlan.hotel}
+                          previousEvent={idx > 0 ? activeDayPlan.events[idx - 1] : undefined}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Add more activity prompt banner at bottom */}
+                    <div className="mt-4 pt-1 no-print">
+                      <button
+                        type="button"
+                        onClick={() => setIsSuggestModalOpen(true)}
+                        className="w-full p-4 rounded-2xl border-2 border-dashed border-amber-300 dark:border-amber-700/60 bg-amber-50/50 dark:bg-amber-950/15 hover:bg-amber-100/60 dark:hover:bg-amber-950/30 text-amber-900 dark:text-amber-200 transition-all text-xs font-bold flex items-center justify-center gap-2 cursor-pointer group"
+                      >
+                        <Sparkles className="w-4 h-4 text-amber-500 group-hover:rotate-12 transition-transform" />
+                        <span>Bạn muốn khám phá thêm điểm nào tại <strong>{activeDayPlan.city}</strong>? Bấm để AI gợi ý!</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Day Navigation Buttons */}
+                  <div className="flex items-center justify-between gap-3 pt-6 pb-8 border-t border-slate-200 dark:border-slate-800 mt-6 no-print">
+                    <button
+                      type="button"
+                      disabled={activeDayPlan.day_number <= 1}
+                      onClick={() => {
+                        setSelectedDayNumber((prev) => Math.max(1, prev - 1));
+                        window.scrollTo({ top: 120, behavior: "smooth" });
+                      }}
+                      className="flex-1 py-3 px-4 rounded-xl bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      <span>Ngày trước</span>
+                    </button>
+
+                    <span className="text-xs font-mono font-bold text-slate-400">
+                      {activeDayPlan.day_number} / {currentTrip.days.length}
+                    </span>
+
+                    <button
+                      type="button"
+                      disabled={activeDayPlan.day_number >= currentTrip.days.length}
+                      onClick={() => {
+                        setSelectedDayNumber((prev) =>
+                          Math.min(currentTrip.days.length, prev + 1)
+                        );
+                        window.scrollTo({ top: 120, behavior: "smooth" });
+                      }}
+                      className="flex-1 py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-amber-500 dark:hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-white dark:text-slate-950 text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+                    >
+                      <span>Ngày tiếp theo</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )
             )}
           </div>
         ) : (
