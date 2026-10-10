@@ -14,7 +14,10 @@ import {
   Clock,
   CheckCircle2,
   Circle,
+  Calculator,
+  Edit2,
 } from "lucide-react";
+import { formatRmb } from "../lib/budgetUtils.js";
 
 interface TimelineCardProps {
   event: ActivityEvent;
@@ -22,6 +25,7 @@ interface TimelineCardProps {
   cityName?: string;
   hotel?: HotelInfo;
   previousEvent?: ActivityEvent;
+  onOpenCostEdit?: () => void;
 }
 
 export const TimelineCard: React.FC<TimelineCardProps> = ({
@@ -30,6 +34,7 @@ export const TimelineCard: React.FC<TimelineCardProps> = ({
   cityName,
   hotel,
   previousEvent,
+  onOpenCostEdit,
 }) => {
   const [isCheckedIn, setIsCheckedIn] = useState<boolean>(false);
 
@@ -101,13 +106,25 @@ export const TimelineCard: React.FC<TimelineCardProps> = ({
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {event.duration_hint && (
               <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/60 px-2 py-0.5 rounded-md">
                 <Clock className="w-3 h-3 text-amber-500" />
                 <span>{event.duration_hint}</span>
               </span>
             )}
+
+            {/* Cost Badge / Quick Edit Button */}
+            <button
+              type="button"
+              onClick={onOpenCostEdit}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-extrabold bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 transition-all cursor-pointer"
+              title="Bấm để nhập/sửa chi phí hoạt động này"
+            >
+              <Calculator className="w-3 h-3 text-amber-500 shrink-0" />
+              <span>{typeof event.cost_rmb === "number" ? formatRmb(event.cost_rmb) : (event.ticket_hint ? `~${event.ticket_hint}` : "+ Chi phí")}</span>
+              <Edit2 className="w-2.5 h-2.5 text-amber-500 opacity-60 ml-0.5" />
+            </button>
 
             <button
               type="button"

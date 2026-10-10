@@ -20,6 +20,9 @@ import { SuggestActivitiesModal } from "./components/SuggestActivitiesModal";
 import { WeatherWidget } from "./components/WeatherWidget";
 import { ShareModal } from "./components/ShareModal";
 import { fetchSharedTrip } from "./lib/shareService";
+import { BudgetTrackerModal } from "./components/BudgetTrackerModal";
+import { CostEditModal } from "./components/CostEditModal";
+import { calculateTripBudgetSummary } from "./lib/budgetUtils";
 import {
   Compass,
   Plus,
@@ -50,6 +53,8 @@ import {
   ArrowLeft,
   Check,
   RotateCcw,
+  Wallet,
+  Calculator,
 } from "lucide-react";
 
 function MainApp() {
@@ -86,6 +91,18 @@ function MainApp() {
   // Sharing states
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [tripToShare, setTripToShare] = useState<TripDocument | null>(null);
+
+  // Budget tracking state
+  const [isBudgetTrackerOpen, setIsBudgetTrackerOpen] = useState<boolean>(false);
+  const [costEditTarget, setCostEditTarget] = useState<{
+    isOpen: boolean;
+    dayIndex: number;
+    eventIndex?: number;
+    isHotel?: boolean;
+  }>({
+    isOpen: false,
+    dayIndex: 0,
+  });
 
   // Shared trip guest viewing states
   const [sharedTrip, setSharedTrip] = useState<TripDocument | null>(null);
@@ -333,6 +350,64 @@ function MainApp() {
     }
   };
 
+  const handleUpdateTripBudget = async (updatedTrip: TripDocument) => {
+    if (user) {
+      try {
+        const updatedList = await saveUserTrip(user.uid, updatedTrip);
+        setTrips(updatedList);
+      } catch (e) {
+        console.error("Failed to save trip budget to Firestore:", e);
+      }
+    } else {
+      setTrips((prev) => {
+        const next = prev.map((t) => (t.id === updatedTrip.id ? updatedTrip : t));
+        localStorage.setItem("tripwise_anonymous_trips", JSON.stringify(next));
+        return next;
+      });
+    }
+  };
+
+  const handleSaveCost = (
+    costRmb: number | undefined,
+    costVnd: number | undefined,
+    category?: string,
+    note?: string
+  ) => {
+    if (!currentTrip) return;
+    const { dayIndex, eventIndex, isHotel } = costEditTarget;
+
+    const updatedDays = [...currentTrip.days];
+    const targetDay = { ...updatedDays[dayIndex] };
+
+    if (isHotel && targetDay.hotel) {
+      targetDay.hotel = {
+        ...targetDay.hotel,
+        cost_rmb: costRmb,
+        cost_vnd: costVnd,
+        cost_note: note,
+      };
+    } else if (typeof eventIndex === "number" && targetDay.events[eventIndex]) {
+      const updatedEvents = [...targetDay.events];
+      updatedEvents[eventIndex] = {
+        ...updatedEvents[eventIndex],
+        cost_rmb: costRmb,
+        cost_vnd: costVnd,
+        cost_category: category as any,
+        cost_note: note,
+      };
+      targetDay.events = updatedEvents;
+    }
+
+    updatedDays[dayIndex] = targetDay;
+    const updatedTrip: TripDocument = {
+      ...currentTrip,
+      days: updatedDays,
+      updated_at: new Date().toISOString(),
+    };
+
+    handleUpdateTripBudget(updatedTrip);
+  };
+
   const handleDeleteCurrentTrip = async (tripId: string) => {
     if (!user) return;
     if (trips.length <= 1) {
@@ -503,8 +578,19 @@ function MainApp() {
             </div>
           </div>
 
-          {/* Action buttons */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Budget Tracker Button */}
+            {currentTrip && (
+              <button
+                type="button"
+                onClick={() => setIsBudgetTrackerOpen(true)}
+                className="flex items-center gap-1.5 py-1.5 px-2.5 sm:px-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-bold border border-amber-500/40 transition-colors cursor-pointer"
+                title="Quản lý ngân sách & chi phí chuyến đi"
+              >
+                <Wallet className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">Ngân Sách</span>
+              </button>
+            )}
+
             {/* Survival Guide */}
             <button
               type="button"
@@ -598,8 +684,7 @@ function MainApp() {
               )}
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
       {/* Guest Mode Banner (No login required view notification) */}
       {isGuestMode && currentTrip && (
@@ -808,6 +893,8 @@ function MainApp() {
               viewMode={viewMode}
               onToggleViewMode={setViewMode}
               onResetCache={handleResetAndClearCache}
+              onOpenBudgetModal={() => setIsBudgetTrackerOpen(true)}
+              totalBudgetRmb={calculateTripBudgetSummary(currentTrip).totalSpentRmb}
               onSelectDay={(dayNum) => {
                 setSelectedDayNumber(dayNum);
                 if (viewMode === "all") {
@@ -837,7 +924,7 @@ function MainApp() {
                   </button>
                 </div>
 
-                {currentTrip.days.map((dayPlan) => (
+                {currentTrip.days.map((dayPlan, dayIdx) => (
                   <section
                     key={dayPlan.day_number}
                     id={`day-section-${dayPlan.day_number}`}
@@ -867,7 +954,14 @@ function MainApp() {
                       dayNumber={dayPlan.day_number}
                       date={dayPlan.date}
                     />
-                    {dayPlan.hotel && <HotelCard hotel={dayPlan.hotel} />}
+                    {dayPlan.hotel && (
+                      <HotelCard
+                        hotel={dayPlan.hotel}
+                        onOpenCostEdit={() =>
+                          setCostEditTarget({ isOpen: true, dayIndex: dayIdx, isHotel: true })
+                        }
+                      />
+                    )}
 
                     {/* Timeline Events Section */}
                     <div>
@@ -886,6 +980,9 @@ function MainApp() {
                             cityName={dayPlan.city}
                             hotel={dayPlan.hotel}
                             previousEvent={idx > 0 ? dayPlan.events[idx - 1] : undefined}
+                            onOpenCostEdit={() =>
+                              setCostEditTarget({ isOpen: true, dayIndex: dayIdx, eventIndex: idx })
+                            }
                           />
                         ))}
                       </div>
@@ -900,7 +997,7 @@ function MainApp() {
                   {/* Active Day Header */}
                   <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 shadow-xs border border-slate-200/80 dark:border-slate-800 mb-4">
                     <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
-                      <span className="text-xs font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                      <span className="text-xs font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5" />
                         {activeDayPlan.date || `Ngày ${activeDayPlan.day_number}`}
                       </span>
@@ -923,7 +1020,21 @@ function MainApp() {
                   />
 
                   {/* Hotel Card if hotel info is present */}
-                  {activeDayPlan.hotel && <HotelCard hotel={activeDayPlan.hotel} />}
+                  {activeDayPlan.hotel && (
+                    <HotelCard
+                      hotel={activeDayPlan.hotel}
+                      onOpenCostEdit={() => {
+                        const activeIdx = currentTrip.days.findIndex(
+                          (d) => d.day_number === activeDayPlan.day_number
+                        );
+                        setCostEditTarget({
+                          isOpen: true,
+                          dayIndex: activeIdx >= 0 ? activeIdx : 0,
+                          isHotel: true,
+                        });
+                      }}
+                    />
+                  )}
 
                   {/* Timeline Events Section */}
                   <div className="mt-6">
@@ -951,6 +1062,16 @@ function MainApp() {
                           cityName={activeDayPlan.city}
                           hotel={activeDayPlan.hotel}
                           previousEvent={idx > 0 ? activeDayPlan.events[idx - 1] : undefined}
+                          onOpenCostEdit={() => {
+                            const activeIdx = currentTrip.days.findIndex(
+                              (d) => d.day_number === activeDayPlan.day_number
+                            );
+                            setCostEditTarget({
+                              isOpen: true,
+                              dayIndex: activeIdx >= 0 ? activeIdx : 0,
+                              eventIndex: idx,
+                            });
+                          }}
                         />
                       ))}
                     </div>
@@ -1201,6 +1322,68 @@ function MainApp() {
           isOpen={isShareModalOpen}
           onClose={() => setIsShareModalOpen(false)}
           trip={tripToShare}
+        />
+      )}
+
+      {/* Budget Tracker Modal */}
+      {currentTrip && (
+        <BudgetTrackerModal
+          isOpen={isBudgetTrackerOpen}
+          onClose={() => setIsBudgetTrackerOpen(false)}
+          trip={currentTrip}
+          onUpdateTrip={handleUpdateTripBudget}
+          onOpenCostEdit={(dayIdx: number, evtIdx?: number, isHotel?: boolean) => {
+            setIsBudgetTrackerOpen(false);
+            setCostEditTarget({ isOpen: true, dayIndex: dayIdx, eventIndex: evtIdx, isHotel });
+          }}
+        />
+      )}
+
+      {/* Cost Edit Modal for Activity / Hotel */}
+      {currentTrip && costEditTarget.isOpen && (
+        <CostEditModal
+          isOpen={costEditTarget.isOpen}
+          onClose={() => setCostEditTarget({ ...costEditTarget, isOpen: false })}
+          title={
+            costEditTarget.isHotel
+              ? `Khách sạn: ${currentTrip.days[costEditTarget.dayIndex]?.hotel?.name_vn || "Khách sạn"}`
+              : `Hoạt động: ${
+                  typeof costEditTarget.eventIndex === "number"
+                    ? currentTrip.days[costEditTarget.dayIndex]?.events[costEditTarget.eventIndex]?.activity_title
+                    : ""
+                }`
+          }
+          subtitle={`Ngày ${currentTrip.days[costEditTarget.dayIndex]?.day_number} (${currentTrip.days[costEditTarget.dayIndex]?.city})`}
+          initialRmb={
+            costEditTarget.isHotel
+              ? currentTrip.days[costEditTarget.dayIndex]?.hotel?.cost_rmb
+              : typeof costEditTarget.eventIndex === "number"
+              ? currentTrip.days[costEditTarget.dayIndex]?.events[costEditTarget.eventIndex]?.cost_rmb
+              : undefined
+          }
+          initialVnd={
+            costEditTarget.isHotel
+              ? currentTrip.days[costEditTarget.dayIndex]?.hotel?.cost_vnd
+              : typeof costEditTarget.eventIndex === "number"
+              ? currentTrip.days[costEditTarget.dayIndex]?.events[costEditTarget.eventIndex]?.cost_vnd
+              : undefined
+          }
+          initialCategory={
+            costEditTarget.isHotel
+              ? "hotel"
+              : typeof costEditTarget.eventIndex === "number"
+              ? (currentTrip.days[costEditTarget.dayIndex]?.events[costEditTarget.eventIndex]?.cost_category as any) || "ticket"
+              : "ticket"
+          }
+          initialNote={
+            costEditTarget.isHotel
+              ? currentTrip.days[costEditTarget.dayIndex]?.hotel?.cost_note || ""
+              : typeof costEditTarget.eventIndex === "number"
+              ? currentTrip.days[costEditTarget.dayIndex]?.events[costEditTarget.eventIndex]?.cost_note || ""
+              : ""
+          }
+          exchangeRate={currentTrip.exchange_rate_rmb_vnd || 3500}
+          onSave={handleSaveCost}
         />
       )}
 

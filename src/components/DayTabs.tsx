@@ -11,6 +11,7 @@ import {
   Layers,
   ListFilter,
   RotateCcw,
+  Wallet,
 } from "lucide-react";
 
 interface DayTabsProps {
@@ -21,6 +22,8 @@ interface DayTabsProps {
   viewMode?: "single" | "all";
   onToggleViewMode?: (mode: "single" | "all") => void;
   onResetCache?: () => void;
+  onOpenBudgetModal?: () => void;
+  totalBudgetRmb?: number;
 }
 
 export function checkIsToday(dateStr: string): boolean {
@@ -51,6 +54,8 @@ export const DayTabs: React.FC<DayTabsProps> = ({
   viewMode = "single",
   onToggleViewMode,
   onResetCache,
+  onOpenBudgetModal,
+  totalBudgetRmb,
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isGridModalOpen, setIsGridModalOpen] = useState(false);
@@ -143,8 +148,24 @@ export const DayTabs: React.FC<DayTabsProps> = ({
               )}
             </div>
 
-            {/* Right actions: Quick Grid Modal & View Mode Toggle */}
+            {/* Right actions: Quick Grid Modal, Budget Modal & View Mode Toggle */}
             <div className="flex items-center gap-1.5">
+              {onOpenBudgetModal && (
+                <button
+                  type="button"
+                  onClick={onOpenBudgetModal}
+                  className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-[11px] sm:text-xs font-black flex items-center gap-1 shadow-sm transition-all active:scale-95 cursor-pointer"
+                  title="Xem tổng hợp ngân sách & chi phí chuyến đi"
+                >
+                  <Wallet className="w-3.5 h-3.5 shrink-0" />
+                  <span>Ngân sách</span>
+                  {typeof totalBudgetRmb === "number" && totalBudgetRmb > 0 && (
+                    <span className="hidden sm:inline-block pl-1 border-l border-slate-900/30 text-[10px]">
+                      ¥{totalBudgetRmb.toLocaleString("vi-VN")}
+                    </span>
+                  )}
+                </button>
+              )}
               {/* View Mode Toggle: Single Day vs All Days */}
               {onToggleViewMode && (
                 <div className="inline-flex items-center p-0.5 rounded-lg bg-slate-800 border border-slate-700 text-[11px]">

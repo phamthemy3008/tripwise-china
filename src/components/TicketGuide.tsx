@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Ticket, ExternalLink, Copy, Check, Calendar, ShieldCheck, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { ActivityEvent } from "../types/itinerary.js";
+import { openAppScheme } from "../lib/deepLink.js";
 
 interface TicketGuideProps {
   event: ActivityEvent;
@@ -28,28 +29,20 @@ export const TicketGuide: React.FC<TicketGuideProps> = ({ event, cityName }) => 
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
 
-    const ua = navigator.userAgent;
-    const isMobile = /iPad|iPhone|iPod|Android/.test(ua);
     const wechatScheme = "weixin://";
     const androidWechatIntent = "intent://#Intent;scheme=weixin;package=com.tencent.mm;end";
 
-    if (isMobile) {
-      toast.info("Đang mở ứng dụng WeChat (微信)...", {
-        description: `Đã tự động sao chép: "${query}" để tìm Mini-App / Công Chúng Hào đặt vé`,
-        duration: 4000,
-      });
-      try {
-        window.location.href = wechatScheme;
-      } catch {
-        window.location.href = androidWechatIntent;
-      }
-    } else {
-      toast.info("Gợi ý: Mở WeChat trên điện thoại quét mã hoặc tìm Mini-App", {
-        description: `Từ khóa: "${query}" (Đã sao chép)`,
-        duration: 3500,
-      });
-      window.open("https://weixin.qq.com", "_blank", "noopener,noreferrer");
-    }
+    toast.info("Đang mở ứng dụng WeChat (微信)...", {
+      description: `Đã tự động sao chép: "${query}" để tìm Mini-App / Công Chúng Hào đặt vé`,
+      duration: 4000,
+    });
+
+    openAppScheme({
+      schemeUrl: wechatScheme,
+      androidIntent: androidWechatIntent,
+      fallbackWebUrl: "https://weixin.qq.com",
+      appStoreUrl: "https://apps.apple.com/app/wechat/id414478124",
+    });
   };
 
   // --- ACTION: OPEN TRIP.COM ---
@@ -65,44 +58,26 @@ export const TicketGuide: React.FC<TicketGuideProps> = ({ event, cityName }) => 
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
 
-    const ua = navigator.userAgent;
-    const isIOS = /iPad|iPhone|iPod/.test(ua);
-    const isAndroid = /Android/.test(ua);
-    const isMobile = isIOS || isAndroid;
-
     // Trip.com app schemes & links
     const tripAppScheme = "trip://";
     const androidTripIntent = `intent://things-to-do?keyword=${encoded}#Intent;scheme=trip;package=com.trip.android;end`;
     const tripWebUrl = `https://vn.trip.com/things-to-do/search/?keyword=${encoded}`;
 
-    if (isMobile) {
-      toast.info("Đang mở ứng dụng Trip.com...", {
-        description: `Tìm vé: "${query}" (Đã tự động sao chép tên điểm đến)`,
-        duration: 4000,
-        action: {
-          label: "Mở Trip Web",
-          onClick: () => window.open(tripWebUrl, "_blank", "noopener,noreferrer"),
-        },
-      });
+    toast.info("Đang mở ứng dụng Trip.com...", {
+      description: `Tìm vé: "${query}" (Đã tự động sao chép tên điểm đến)`,
+      duration: 4000,
+      action: {
+        label: "Mở Trip Web",
+        onClick: () => window.open(tripWebUrl, "_blank", "noopener,noreferrer"),
+      },
+    });
 
-      if (isIOS) {
-        window.location.href = tripAppScheme;
-      } else if (isAndroid) {
-        try {
-          window.location.href = tripAppScheme;
-        } catch {
-          window.location.href = androidTripIntent;
-        }
-      } else {
-        window.open(tripWebUrl, "_blank", "noopener,noreferrer");
-      }
-    } else {
-      toast.info("Đang mở cổng đặt vé Trip.com...", {
-        description: `Tìm vé điểm tham quan: "${query}"`,
-        duration: 3000,
-      });
-      window.open(tripWebUrl, "_blank", "noopener,noreferrer");
-    }
+    openAppScheme({
+      schemeUrl: tripAppScheme,
+      androidIntent: androidTripIntent,
+      fallbackWebUrl: tripWebUrl,
+      appStoreUrl: "https://apps.apple.com/app/trip-com-book-flights-hotels/id681880144",
+    });
   };
 
   if (!event.ticket_hint) return null;

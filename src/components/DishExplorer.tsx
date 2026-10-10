@@ -20,6 +20,7 @@ import {
 import { DishItem, RestaurantRecommendation } from "../types/itinerary";
 import { CopyChip } from "./CopyChip";
 import { toast } from "sonner";
+import { openAppScheme } from "../lib/deepLink";
 
 interface DishExplorerProps {
   dishes: DishItem[];
@@ -63,94 +64,58 @@ export const DishExplorer: React.FC<DishExplorerProps> = ({
 
   const openAmapSearch = (keyword: string) => {
     const encoded = encodeURIComponent(keyword);
-    const ua = navigator.userAgent;
-    const isIOS = /iPad|iPhone|iPod/.test(ua);
-    const isAndroid = /Android/.test(ua);
-    const isMobile = isIOS || isAndroid;
 
-    // Auto-copy Chinese keyword to clipboard for convenience
     if (navigator.clipboard) {
       navigator.clipboard.writeText(keyword).catch(() => {});
     }
 
     const iosPoiUrl = `iosamap://poi?sourceApplication=tripwise&name=${encoded}&keywords=${encoded}&dev=0`;
-    const androidPoiUrl = `androidamap://poi?sourceApplication=tripwise&name=${encoded}&keywords=${encoded}&dev=0`;
     const androidIntentUrl = `intent://poi?sourceApplication=tripwise&name=${encoded}&keywords=${encoded}&dev=0#Intent;scheme=androidamap;package=com.autonavi.minimap;end`;
     const webUrl = `https://uri.amap.com/search?keyword=${encoded}`;
 
-    if (isMobile) {
-      toast.info("Đang mở ứng dụng Bản đồ Amap...", {
-        description: `"${keyword}" (Đã tự động copy tên chữ Hán)`,
-        duration: 3500,
-        action: {
-          label: "Mở trên Web",
-          onClick: () => window.open(webUrl, "_blank", "noopener,noreferrer"),
-        },
-      });
+    toast.info("Đang mở Bản đồ Amap...", {
+      description: `"${keyword}" (Đã tự động sao chép tên chữ Hán)`,
+      duration: 3500,
+      action: {
+        label: "Mở trên Web",
+        onClick: () => window.open(webUrl, "_blank", "noopener,noreferrer"),
+      },
+    });
 
-      if (isIOS) {
-        window.location.href = iosPoiUrl;
-      } else if (isAndroid) {
-        try {
-          window.location.href = androidPoiUrl;
-        } catch {
-          window.location.href = androidIntentUrl;
-        }
-      } else {
-        window.open(webUrl, "_blank", "noopener,noreferrer");
-      }
-    } else {
-      toast.info(`Đang mở Gaode Amap tìm: "${keyword}"`, { duration: 2000 });
-      window.open(webUrl, "_blank", "noopener,noreferrer");
-    }
+    openAppScheme({
+      schemeUrl: iosPoiUrl,
+      androidIntent: androidIntentUrl,
+      fallbackWebUrl: webUrl,
+      appStoreUrl: "https://apps.apple.com/app/amap-map-location-navigation/id461703219",
+    });
   };
 
   const openDianpingSearch = (keyword: string) => {
     const encoded = encodeURIComponent(keyword);
-    const ua = navigator.userAgent;
-    const isIOS = /iPad|iPhone|iPod/.test(ua);
-    const isAndroid = /Android/.test(ua);
-    const isMobile = isIOS || isAndroid;
 
-    // Auto-copy Chinese keyword to clipboard
     if (navigator.clipboard) {
       navigator.clipboard.writeText(keyword).catch(() => {});
     }
 
-    // Official Dianping (大众点评) deep link URL scheme & Android Intent
     const dianpingSchemeUrl = `dianping://searchshoplist?keyword=${encoded}`;
     const androidIntentUrl = `intent://searchshoplist?keyword=${encoded}#Intent;scheme=dianping;package=com.dianping.v1;end`;
     const mobileWebUrl = `https://m.dianping.com/search/keyword/0/0_${encoded}`;
-    const desktopWebUrl = `https://www.dianping.com/search/keyword/1/0_${encoded}`;
 
-    if (isMobile) {
-      toast.info("Đang mở ứng dụng Dianping (Đại Chúng Điểm Bình)...", {
-        description: `"${keyword}" (Đã tự động copy tên chữ Hán)`,
-        duration: 4000,
-        action: {
-          label: "Mở trên Web",
-          onClick: () => window.open(mobileWebUrl, "_blank", "noopener,noreferrer"),
-        },
-      });
+    toast.info("Đang mở Dianping (Đại Chúng Điểm Bình)...", {
+      description: `"${keyword}" (Đã tự động sao chép tên chữ Hán)`,
+      duration: 4000,
+      action: {
+        label: "Mở trên Web",
+        onClick: () => window.open(mobileWebUrl, "_blank", "noopener,noreferrer"),
+      },
+    });
 
-      if (isIOS) {
-        window.location.href = dianpingSchemeUrl;
-      } else if (isAndroid) {
-        try {
-          window.location.href = dianpingSchemeUrl;
-        } catch {
-          window.location.href = androidIntentUrl;
-        }
-      } else {
-        window.open(mobileWebUrl, "_blank", "noopener,noreferrer");
-      }
-    } else {
-      toast.info(`Đang mở Dianping tìm kiếm: "${keyword}"`, {
-        description: "Ứng dụng ẩm thực & đánh giá số 1 Trung Quốc",
-        duration: 2500,
-      });
-      window.open(desktopWebUrl, "_blank", "noopener,noreferrer");
-    }
+    openAppScheme({
+      schemeUrl: dianpingSchemeUrl,
+      androidIntent: androidIntentUrl,
+      fallbackWebUrl: mobileWebUrl,
+      appStoreUrl: "https://apps.apple.com/app/dianping-find-food-deals/id351421652",
+    });
   };
 
   const copyTaxiNote = async (restaurantName: string, nameZh: string, address?: string) => {

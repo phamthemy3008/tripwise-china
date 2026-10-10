@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { ActivityEvent, HotelInfo } from "../types/itinerary.js";
 import { parseTransportEvent, ParsedTransport } from "../lib/transportParser.js";
 import { CopyChip } from "./CopyChip.js";
+import { openAppScheme } from "../lib/deepLink.js";
 
 interface TransportGuideProps {
   event: ActivityEvent;
@@ -81,44 +82,26 @@ export const TransportGuide: React.FC<TransportGuideProps> = ({
       navigator.clipboard.writeText(stationZh).catch(() => {});
     }
 
-    const ua = navigator.userAgent;
-    const isIOS = /iPad|iPhone|iPod/.test(ua);
-    const isAndroid = /Android/.test(ua);
-    const isMobile = isIOS || isAndroid;
-
     const metroScheme = "metroman://";
     const androidIntent = "intent://#Intent;scheme=metroman;package=cn.metroman;end";
-    const webMetroUrl = "https://www.metroman.cn";
     const amapSubwayUrl = "https://map.amap.com/subway/index.html";
+    const appStoreUrl = "https://apps.apple.com/app/metroman-china-subway/id466351037";
 
-    if (isMobile) {
-      toast.info("Đang mở ứng dụng MetroMan...", {
-        description: `Ga đến: "${stationZh}" (Đã tự động sao chép chữ Hán để dán vào app)`,
-        duration: 4000,
-        action: {
-          label: "Bản đồ Subway Web",
-          onClick: () => window.open(amapSubwayUrl, "_blank", "noopener,noreferrer"),
-        },
-      });
+    toast.info("Đang mở MetroMan / Bản đồ Subway...", {
+      description: `Ga đến: "${stationZh}" (${line}) - Đã tự động sao chép chữ Hán`,
+      duration: 4000,
+      action: {
+        label: "Bản đồ Subway Web",
+        onClick: () => window.open(amapSubwayUrl, "_blank", "noopener,noreferrer"),
+      },
+    });
 
-      if (isIOS) {
-        window.location.href = metroScheme;
-      } else if (isAndroid) {
-        try {
-          window.location.href = metroScheme;
-        } catch {
-          window.location.href = androidIntent;
-        }
-      } else {
-        window.open(webMetroUrl, "_blank", "noopener,noreferrer");
-      }
-    } else {
-      toast.info("Đang mở bản đồ tàu điện MetroMan / Amap Subway...", {
-        description: `Ga đến: "${stationZh}" (${line}) - Đã sao chép chữ Hán`,
-        duration: 3000,
-      });
-      window.open(amapSubwayUrl, "_blank", "noopener,noreferrer");
-    }
+    openAppScheme({
+      schemeUrl: metroScheme,
+      androidIntent,
+      fallbackWebUrl: amapSubwayUrl,
+      appStoreUrl,
+    });
   };
 
   // --- ACTIONS: DIDI / ALIPAY DIDI ---
@@ -126,37 +109,27 @@ export const TransportGuide: React.FC<TransportGuideProps> = ({
     e.stopPropagation();
     const destinationZh = parsed.taxi?.dropoffZh || event.place_zh || event.place_name;
 
-    // Copy destination Chinese characters
     if (navigator.clipboard) {
       navigator.clipboard.writeText(destinationZh).catch(() => {});
     }
 
-    const ua = navigator.userAgent;
-    const isIOS = /iPad|iPhone|iPod/.test(ua);
-    const isAndroid = /Android/.test(ua);
-    const isMobile = isIOS || isAndroid;
-
-    // Alipay DiDi Mini App Scheme (appId=20000778)
     const alipayDidiScheme = "alipays://platformapi/startapp?appId=20000778";
     const fallbackWeb = "https://common.diditaxi.com.cn";
 
-    if (isMobile) {
-      toast.info("Đang mở DiDi trên Alipay...", {
-        description: `Điểm đến: "${destinationZh}" (Đã tự động sao chép để dán vào ô tìm kiếm DiDi)`,
-        duration: 4000,
-        action: {
-          label: "Mở DiDi Web",
-          onClick: () => window.open(fallbackWeb, "_blank", "noopener,noreferrer"),
-        },
-      });
-      window.location.href = alipayDidiScheme;
-    } else {
-      toast.info("Gợi ý: Mở app Alipay trên điện thoại để dùng DiDi tiện lợi nhất", {
-        description: `Điểm đến: "${destinationZh}" (Đã sao chép chữ Hán)`,
-        duration: 3500,
-      });
-      window.open(fallbackWeb, "_blank", "noopener,noreferrer");
-    }
+    toast.info("Đang mở DiDi trên Alipay...", {
+      description: `Điểm đến: "${destinationZh}" (Đã tự động sao chép chữ Hán)`,
+      duration: 4000,
+      action: {
+        label: "Mở DiDi Web",
+        onClick: () => window.open(fallbackWeb, "_blank", "noopener,noreferrer"),
+      },
+    });
+
+    openAppScheme({
+      schemeUrl: alipayDidiScheme,
+      fallbackWebUrl: fallbackWeb,
+      appStoreUrl: "https://apps.apple.com/app/alipay-simplify-your-life/id333206289",
+    });
   };
 
   const handleOpenDidiStandalone = (e: React.MouseEvent) => {
@@ -171,22 +144,17 @@ export const TransportGuide: React.FC<TransportGuideProps> = ({
     const didiAndroidIntent = "intent://#Intent;scheme=diditaxi;package=com.sdu.didi.psnger;end";
     const didiWeb = "https://www.didiglobal.com";
 
-    const ua = navigator.userAgent;
-    const isMobile = /iPad|iPhone|iPod|Android/.test(ua);
+    toast.info("Đang mở ứng dụng DiDi...", {
+      description: `Điểm đến: "${destinationZh}" (Đã tự động sao chép chữ Hán)`,
+      duration: 3500,
+    });
 
-    if (isMobile) {
-      toast.info("Đang mở ứng dụng DiDi...", {
-        description: `Điểm đến: "${destinationZh}" (Đã tự động sao chép chữ Hán)`,
-        duration: 3500,
-      });
-      try {
-        window.location.href = didiScheme;
-      } catch {
-        window.location.href = didiAndroidIntent;
-      }
-    } else {
-      window.open(didiWeb, "_blank", "noopener,noreferrer");
-    }
+    openAppScheme({
+      schemeUrl: didiScheme,
+      androidIntent: didiAndroidIntent,
+      fallbackWebUrl: didiWeb,
+      appStoreUrl: "https://apps.apple.com/app/didi-rider-easy-fast-travel/id1362300063",
+    });
   };
 
   // --- ACTIONS: HIGH-SPEED TRAIN 12306 ---
@@ -195,45 +163,28 @@ export const TransportGuide: React.FC<TransportGuideProps> = ({
     const trainNum = parsed.train?.trainNumber || "Tàu cao tốc";
     const fromStation = parsed.train?.departureStationZh || "";
     const toStation = parsed.train?.arrivalStationZh || "";
-    const copySummary = `${trainNum} (${fromStation} ➔ ${toStation})`;
 
     if (navigator.clipboard) {
       navigator.clipboard.writeText(trainNum).catch(() => {});
     }
 
-    const ua = navigator.userAgent;
-    const isMobile = /iPad|iPhone|iPod|Android/.test(ua);
-
     const app12306Scheme = "mobile12306://";
-    const alipay12306Scheme = "alipays://platformapi/startapp?appId=2018091461349076";
-    const web12306 = "https://kyfw.12306.cn/otn/leftTicket/init";
     const tripTrainWeb = `https://vn.trip.com/trains/china?search=${encodeURIComponent(trainNum)}`;
 
-    if (isMobile) {
-      toast.info(`Đang mở app 12306 chuyến ${trainNum}...`, {
-        description: `Lộ trình: ${fromStation} ➔ ${toStation} (Đã sao chép mã tàu: ${trainNum})`,
-        duration: 4500,
-        action: {
-          label: "Mở 12306 Alipay",
-          onClick: () => {
-            window.location.href = alipay12306Scheme;
-          },
-        },
-      });
+    toast.info(`Đang mở tra cứu vé tàu ${trainNum}...`, {
+      description: `Lộ trình: ${fromStation} ➔ ${toStation} (Đã sao chép mã chuyến tàu)`,
+      duration: 4500,
+      action: {
+        label: "Mở Trip.com Web",
+        onClick: () => window.open(tripTrainWeb, "_blank", "noopener,noreferrer"),
+      },
+    });
 
-      // Try official 12306 scheme
-      try {
-        window.location.href = app12306Scheme;
-      } catch {
-        window.location.href = alipay12306Scheme;
-      }
-    } else {
-      toast.info(`Mã chuyến tàu ${trainNum} đã được sao chép!`, {
-        description: `Đang mở cổng tra cứu vé tàu 12306 / Trip.com...`,
-        duration: 3500,
-      });
-      window.open(tripTrainWeb, "_blank", "noopener,noreferrer");
-    }
+    openAppScheme({
+      schemeUrl: app12306Scheme,
+      fallbackWebUrl: tripTrainWeb,
+      appStoreUrl: "https://apps.apple.com/app/12306/id564817461",
+    });
   };
 
   return (

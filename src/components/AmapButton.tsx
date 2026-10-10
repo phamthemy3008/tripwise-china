@@ -1,6 +1,7 @@
 import React from "react";
 import { MapPin, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
+import { openAppScheme } from "../lib/deepLink.js";
 
 interface AmapButtonProps {
   query: string;
@@ -16,56 +17,30 @@ export const AmapButton: React.FC<AmapButtonProps> = ({
   const handleAmapOpen = (e: React.MouseEvent) => {
     e.stopPropagation();
     const encoded = encodeURIComponent(query);
-    const ua = navigator.userAgent;
-    const isIOS = /iPad|iPhone|iPod/.test(ua);
-    const isAndroid = /Android/.test(ua);
-    const isMobile = isIOS || isAndroid;
 
-    // Official Gaode Amap POI Search scheme:
-    // iosamap://poi?sourceApplication=tripwise&name=...&keywords=...
-    // androidamap://poi?sourceApplication=tripwise&name=...&keywords=...
     const iosPoiUrl = `iosamap://poi?sourceApplication=tripwise&name=${encoded}&keywords=${encoded}&dev=0`;
-    const androidPoiUrl = `androidamap://poi?sourceApplication=tripwise&name=${encoded}&keywords=${encoded}&dev=0`;
     const androidIntentUrl = `intent://poi?sourceApplication=tripwise&name=${encoded}&keywords=${encoded}&dev=0#Intent;scheme=androidamap;package=com.autonavi.minimap;end`;
-
-    // Standard Web Search URL for desktop or manual fallback
     const webAmapStandardUrl = `https://uri.amap.com/search?keyword=${encoded}`;
 
-    // Auto-copy Chinese keyword to clipboard
     if (navigator.clipboard) {
       navigator.clipboard.writeText(query).catch(() => {});
     }
 
-    if (isMobile) {
-      toast.info("Đang mở ứng dụng Bản đồ Amap...", {
-        description: `Địa danh: "${query}" (Đã tự động copy chữ Hán)`,
-        duration: 3500,
-        action: {
-          label: "Mở trên Web",
-          onClick: () => window.open(webAmapStandardUrl, "_blank", "noopener,noreferrer"),
-        },
-      });
+    toast.info("Đang mở Bản đồ Amap...", {
+      description: `Địa danh: "${query}" (Đã tự động sao chép chữ Hán)`,
+      duration: 3500,
+      action: {
+        label: "Mở trên Web",
+        onClick: () => window.open(webAmapStandardUrl, "_blank", "noopener,noreferrer"),
+      },
+    });
 
-      // Launch native app ONLY - DO NOT force browser redirect to avoid double-opening uri.amap.com
-      if (isIOS) {
-        window.location.href = iosPoiUrl;
-      } else if (isAndroid) {
-        try {
-          window.location.href = androidPoiUrl;
-        } catch {
-          window.location.href = androidIntentUrl;
-        }
-      } else {
-        window.open(webAmapStandardUrl, "_blank", "noopener,noreferrer");
-      }
-    } else {
-      // Desktop PC: Open browser web version in a new tab
-      toast.info("Đang mở bản đồ Amap trên trình duyệt...", {
-        description: `Tìm kiếm địa danh: "${query}"`,
-        duration: 2000,
-      });
-      window.open(webAmapStandardUrl, "_blank", "noopener,noreferrer");
-    }
+    openAppScheme({
+      schemeUrl: iosPoiUrl,
+      androidIntent: androidIntentUrl,
+      fallbackWebUrl: webAmapStandardUrl,
+      appStoreUrl: "https://apps.apple.com/app/amap-map-location-navigation/id461703219",
+    });
   };
 
   return (
