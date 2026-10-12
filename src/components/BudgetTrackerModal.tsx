@@ -20,6 +20,7 @@ import {
   RefreshCw,
   DollarSign,
   Layers,
+  BarChart3,
 } from "lucide-react";
 import { toast } from "sonner";
 import { TripDocument, CustomExpenseItem } from "../types/itinerary";
@@ -30,6 +31,7 @@ import {
   DEFAULT_EXCHANGE_RATE,
   CATEGORY_LABELS,
 } from "../lib/budgetUtils";
+import { ExpenseAnalyticsDashboard } from "./ExpenseAnalyticsDashboard";
 
 interface BudgetTrackerModalProps {
   isOpen: boolean;
@@ -46,7 +48,7 @@ export const BudgetTrackerModal: React.FC<BudgetTrackerModalProps> = ({
   onUpdateTrip,
   onOpenCostEdit,
 }) => {
-  const [activeTab, setActiveTab] = useState<"overview" | "categories" | "days" | "custom">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "analytics" | "categories" | "days" | "custom">("overview");
   const [isSettingBudgetCap, setIsSettingBudgetCap] = useState<boolean>(false);
   const [budgetCappingRmb, setBudgetCappingRmb] = useState<string>(
     trip.budget_cap_rmb ? String(trip.budget_cap_rmb) : ""
@@ -380,6 +382,18 @@ export const BudgetTrackerModal: React.FC<BudgetTrackerModalProps> = ({
 
           <button
             type="button"
+            onClick={() => setActiveTab("analytics")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === "analytics"
+                ? "bg-amber-500 text-slate-950 shadow-sm"
+                : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+            }`}
+          >
+            <BarChart3 className="w-3.5 h-3.5 text-blue-400" /> Biểu Đồ &amp; Phân Tích
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab("categories")}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
               activeTab === "categories"
@@ -464,23 +478,56 @@ export const BudgetTrackerModal: React.FC<BudgetTrackerModalProps> = ({
                 </div>
               </div>
 
-              {/* Quick instructions banner */}
-              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 flex items-start gap-3">
-                <Sparkles className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-bold text-amber-300">Cách nhập & chỉnh sửa chi phí:</p>
-                  <p className="mt-1 text-slate-300 leading-relaxed">
-                    • Bạn có thể nhấn trực tiếp vào thẻ <strong>"Giá vé"</strong> hoặc{" "}
-                    <strong>"Giá phòng"</strong> ở từng thẻ lịch trình để cập nhật giá RMB thực tế.
-                    <br />• Muốn thêm vé máy bay, SIM 4G/eSIM, Visa hoặc các khoản chi cố định, chọn tab{" "}
-                    <strong>"Khoản Chi Khác"</strong>.
-                  </p>
+                {/* Visual Analytics CTA banner in overview */}
+                <div className="p-4 rounded-2xl bg-blue-950/40 border border-blue-800/60 text-xs text-blue-200 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-blue-600/20 border border-blue-500/30 text-blue-400 shrink-0">
+                      <BarChart3 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="font-extrabold text-white text-sm">Biểu Đồ &amp; Cảnh Báo Bội Chi Recharts</p>
+                      <p className="text-slate-400 text-xs mt-0.5">
+                        Xem cơ cấu phân bổ Donut, tiến độ chi tiêu theo ngày và hạn mức từng nhóm chi phí.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("analytics")}
+                    className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shrink-0 transition-all cursor-pointer shadow-sm active:scale-95 flex items-center gap-1.5"
+                  >
+                    <span>Xem Biểu Đồ</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Quick instructions banner */}
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 flex items-start gap-3">
+                  <Sparkles className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-amber-300">Cách nhập & chỉnh sửa chi phí:</p>
+                    <p className="mt-1 text-slate-300 leading-relaxed">
+                      • Bạn có thể nhấn trực tiếp vào thẻ <strong>"Giá vé"</strong> hoặc{" "}
+                      <strong>"Giá phòng"</strong> ở từng thẻ lịch trình để cập nhật giá RMB thực tế.
+                      <br />• Muốn thêm vé máy bay, SIM 4G/eSIM, Visa hoặc các khoản chi cố định, chọn tab{" "}
+                      <strong>"Khoản Chi Khác"</strong>.
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+
+          {/* TAB 2: VISUAL ANALYTICS DASHBOARD (RECHARTS) */}
+          {activeTab === "analytics" && (
+            <ExpenseAnalyticsDashboard
+              trip={trip}
+              summary={summary}
+              onUpdateTrip={onUpdateTrip}
+              onOpenCostEdit={onOpenCostEdit}
+            />
           )}
 
-          {/* TAB 2: CATEGORIES BREAKDOWN */}
+          {/* TAB 3: CATEGORIES BREAKDOWN */}
           {activeTab === "categories" && (
             <div className="space-y-3">
               {summary.categoryBreakdowns.length === 0 ? (

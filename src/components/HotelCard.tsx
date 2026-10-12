@@ -8,9 +8,10 @@ import { formatRmb } from "../lib/budgetUtils";
 interface HotelCardProps {
   hotel: HotelInfo;
   onOpenCostEdit?: () => void;
+  onEditHotel?: () => void;
 }
 
-export const HotelCard: React.FC<HotelCardProps> = ({ hotel, onOpenCostEdit }) => {
+export const HotelCard: React.FC<HotelCardProps> = ({ hotel, onOpenCostEdit, onEditHotel }) => {
   return (
     <div className="bg-gradient-to-br from-indigo-900/90 to-slate-900 text-white rounded-2xl p-4 sm:p-5 shadow-lg border border-indigo-700/40 my-4">
       <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
@@ -28,7 +29,19 @@ export const HotelCard: React.FC<HotelCardProps> = ({ hotel, onOpenCostEdit }) =
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {onEditHotel && (
+            <button
+              type="button"
+              onClick={onEditHotel}
+              className="inline-flex items-center gap-1 text-[11px] font-semibold bg-indigo-500/30 text-indigo-200 hover:bg-indigo-500/50 hover:text-white px-2.5 py-1 rounded-full border border-indigo-400/40 transition-all cursor-pointer"
+              title="Chỉnh sửa thông tin khách sạn (Tên, Chữ Hán, Địa chỉ, Số điện thoại)"
+            >
+              <Edit2 className="w-3 h-3 text-indigo-300" />
+              <span>Sửa Khách Sạn</span>
+            </button>
+          )}
+
           {typeof hotel.cost_rmb === "number" && hotel.cost_rmb > 0 ? (
             <button
               type="button"

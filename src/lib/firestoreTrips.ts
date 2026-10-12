@@ -16,8 +16,116 @@ export function getUserStorageKey(uid: string) {
 }
 
 /**
+ * Auto-corrects erroneous station names and outdated cached transport details in any trip
+ */
+export function healStationNamesInTrip(trip: TripDocument): { trip: TripDocument; changed: boolean } {
+  let changed = false;
+  if (!trip.days) return { trip, changed: false };
+
+  const fullSample = SAMPLE_TRIPS[0];
+  const isZhangjiajieTrip =
+    trip.id === fullSample?.id ||
+    trip.trip_title?.includes("Trương Gia Giới") ||
+    trip.trip_title?.includes("Nga Mi") ||
+    trip.trip_title?.includes("Vũ Long");
+
+  const healedDays = trip.days.map((day, dIdx) => {
+    let dayChanged = false;
+    const sampleDay = isZhangjiajieTrip && fullSample?.days ? fullSample.days[dIdx] : undefined;
+
+    const healedEvents = day.events.map((evt, eIdx) => {
+      let evtChanged = false;
+      const sampleEvt = sampleDay?.events?.[eIdx];
+      let newEvt = { ...evt };
+
+      // 1. Fix Day 6: Chongqing railway station -> Chongqing North
+      if (
+        (newEvt.place_zh === "重庆站" || newEvt.place_name?.includes("Ga Trùng Khánh –")) &&
+        (newEvt.activity_title?.includes("G2436") || day.day_number === 6)
+      ) {
+        newEvt.place_zh = "重庆北站";
+        newEvt.place_name = "Ga Trùng Khánh Bắc – Giải Phóng Bối";
+        newEvt.amap_query = "重庆北站南广场";
+        newEvt.activity_title = "Tàu cao tốc G2436 về trung tâm Trùng Khánh (Ga Trùng Khánh Bắc)";
+        evtChanged = true;
+      }
+
+      // 2. Fix Day 7: Liziba monorail station -> Liziba
+      if (newEvt.place_zh === "李子坝单轨站") {
+        newEvt.place_zh = "李子坝站";
+        newEvt.amap_query = "李子坝站";
+        evtChanged = true;
+      }
+
+      // 3. Fix Day 10: "hướng Viêm Bắc" -> "hướng Weijianian / 韦家碾"
+      if (newEvt.transport_detail?.summary?.includes("Viêm Bắc")) {
+        newEvt.transport_detail = {
+          ...newEvt.transport_detail,
+          summary: newEvt.transport_detail.summary.replace("Viêm Bắc", "Weijianian / 韦家碾"),
+        };
+        evtChanged = true;
+      }
+
+      // 4. Fix Day 13: "Qingchengtrail" -> "Qingchengshan"
+      if (newEvt.transport_hint?.includes("Qingchengtrail")) {
+        newEvt.transport_hint = newEvt.transport_hint.replace("Qingchengtrail", "Thanh Thành Sơn (青城山站)");
+        evtChanged = true;
+      }
+
+      // 5. If sample has transport_detail and current event lacks it, backfill
+      if (!newEvt.transport_detail && sampleEvt?.transport_detail) {
+        newEvt.transport_detail = sampleEvt.transport_detail;
+        evtChanged = true;
+      } else if (newEvt.transport_detail && sampleEvt?.transport_detail) {
+        // Heal station names inside transport_detail if outdated
+        if (
+          sampleEvt.transport_detail.departure_station_vn !== newEvt.transport_detail.departure_station_vn ||
+          sampleEvt.transport_detail.arrival_station_vn !== newEvt.transport_detail.arrival_station_vn ||
+          sampleEvt.transport_detail.arrival_station_zh !== newEvt.transport_detail.arrival_station_zh
+        ) {
+          newEvt.transport_detail = {
+            ...newEvt.transport_detail,
+            ...sampleEvt.transport_detail,
+          };
+          evtChanged = true;
+        }
+      }
+
+      if (evtChanged) {
+        dayChanged = true;
+        changed = true;
+      }
+      return newEvt;
+    });
+
+    if (dayChanged) {
+      return { ...day, events: healedEvents };
+    }
+    return day;
+  });
+
+  let healedTrip = changed ? { ...trip, days: healedDays } : trip;
+
+  // Backfill category budget caps if missing
+  if (isZhangjiajieTrip && !healedTrip.category_budget_caps && fullSample?.category_budget_caps) {
+    healedTrip = {
+      ...healedTrip,
+      category_budget_caps: fullSample.category_budget_caps,
+      budget_cap_rmb: healedTrip.budget_cap_rmb || fullSample.budget_cap_rmb,
+    };
+    changed = true;
+  }
+
+  return {
+    trip: healedTrip,
+    changed,
+  };
+}
+
+/**
  * Checks if any loaded trips are outdated versions of the 16-day sample trip
- * (e.g., old versions cached on phone that only had 2 days) and upgrades them to the complete 16 days.
+ * (e.g., old versions cached on phone that only had 2 days) and upgrades them to the complete 16 days,
+ * as well as auto-healing any erroneous station names.
  */
 export function upgradeTripsWithFullSample(trips: TripDocument[]): {
   upgraded: TripDocument[];
@@ -42,6 +150,14 @@ export function upgradeTripsWithFullSample(trips: TripDocument[]): {
         id: trip.id || fullSample.id,
       };
     }
+
+    // Auto-heal station names in existing trips
+    const healed = healStationNamesInTrip(trip);
+    if (healed.changed) {
+      hasChanges = true;
+      return healed.trip;
+    }
+
     return trip;
   });
 

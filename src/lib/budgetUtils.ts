@@ -3,12 +3,13 @@ import { TripDocument, ActivityEvent, HotelInfo, CustomExpenseItem, DayPlan } fr
 export const DEFAULT_EXCHANGE_RATE = 3500; // 1 RMB = 3,500 VND
 
 export interface CategoryBreakdown {
-  category: "flight" | "visa" | "esim" | "insurance" | "shopping" | "hotel" | "ticket" | "other";
+  category: string;
   categoryLabel: string;
   totalRmb: number;
   totalVnd: number;
   count: number;
   color: string;
+  hexColor: string;
 }
 
 export interface DayExpenseSummary {
@@ -19,6 +20,21 @@ export interface DayExpenseSummary {
   hotelCostRmb: number;
   totalRmb: number;
   totalVnd: number;
+}
+
+export interface CategoryBudgetStatus {
+  category: string;
+  categoryLabel: string;
+  spentRmb: number;
+  spentVnd: number;
+  budgetCapRmb?: number;
+  budgetCapVnd?: number;
+  percentUsed: number;
+  isOverBudget: boolean;
+  overAmountRmb: number;
+  overAmountVnd: number;
+  status: "normal" | "warning" | "danger";
+  hexColor: string;
 }
 
 export interface TripBudgetSummary {
@@ -33,17 +49,20 @@ export interface TripBudgetSummary {
   exchangeRate: number;
   categoryBreakdowns: CategoryBreakdown[];
   daySummaries: DayExpenseSummary[];
+  categoryStatuses: CategoryBudgetStatus[];
 }
 
-export const CATEGORY_LABELS: Record<string, { label: string; color: string }> = {
-  ticket: { label: "Vé tham quan & Hoạt động", color: "bg-amber-500 text-slate-950" },
-  hotel: { label: "Khách sạn & Lưu trú", color: "bg-emerald-500 text-white" },
-  flight: { label: "Vé máy bay & Di chuyển", color: "bg-blue-500 text-white" },
-  visa: { label: "Visa & Thủ tục", color: "bg-purple-500 text-white" },
-  esim: { label: "SIM / eSIM / Internet", color: "bg-cyan-500 text-white" },
-  insurance: { label: "Bảo hiểm du lịch", color: "bg-rose-500 text-white" },
-  shopping: { label: "Mua sắm & An uống", color: "bg-orange-500 text-white" },
-  other: { label: "Chi phí khác", color: "bg-slate-500 text-white" },
+export const CATEGORY_LABELS: Record<string, { label: string; color: string; hexColor: string }> = {
+  hotel: { label: "Khách sạn & Lưu trú", color: "bg-emerald-500 text-white", hexColor: "#10B981" },
+  food: { label: "Ẩm thực & Ăn uống", color: "bg-amber-500 text-slate-950", hexColor: "#F59E0B" },
+  transport: { label: "Di chuyển & Tàu xe", color: "bg-blue-500 text-white", hexColor: "#3B82F6" },
+  ticket: { label: "Vé tham quan & Hoạt động", color: "bg-purple-500 text-white", hexColor: "#8B5CF6" },
+  flight: { label: "Vé máy bay", color: "bg-sky-500 text-white", hexColor: "#0EA5E9" },
+  shopping: { label: "Mua sắm & Quà lưu niệm", color: "bg-rose-500 text-white", hexColor: "#F43F5E" },
+  visa: { label: "Visa & Thủ tục", color: "bg-indigo-500 text-white", hexColor: "#6366F1" },
+  esim: { label: "SIM / eSIM / Internet", color: "bg-teal-500 text-white", hexColor: "#14B8A6" },
+  insurance: { label: "Bảo hiểm du lịch", color: "bg-emerald-600 text-white", hexColor: "#059669" },
+  other: { label: "Chi phí khác", color: "bg-slate-500 text-white", hexColor: "#64748B" },
 };
 
 /**
@@ -51,7 +70,6 @@ export const CATEGORY_LABELS: Record<string, { label: string; color: string }> =
  */
 export function parseCostFromHint(hint?: string): number | undefined {
   if (!hint) return undefined;
-  // Match regex for numbers near RMB, ¥, or yuan
   const match = hint.match(/(\d+(?:\.\d+)?)\s*(?:RMB|¥|Yuan|Tệ)/i) || hint.match(/(?:RMB|¥|Yuan|Tệ)\s*(\d+(?:\.\d+)?)/i) || hint.match(/~(\d+(?:\.\d+)?)/);
   if (match && match[1]) {
     const val = parseFloat(match[1]);
@@ -62,7 +80,7 @@ export function parseCostFromHint(hint?: string): number | undefined {
 
 export function formatRmb(amount?: number): string {
   if (amount === undefined || amount === null || isNaN(amount)) return "0 ¥";
-  return `¥${amount.toLocaleString("vi-VN")}`;
+  return `¥${Math.round(amount).toLocaleString("vi-VN")}`;
 }
 
 export function formatVnd(amount?: number): string {
@@ -74,9 +92,26 @@ export function getEventCostRmb(event: ActivityEvent): number {
   if (typeof event.cost_rmb === "number") {
     return event.cost_rmb;
   }
-  // Try fallback parsing from ticket_hint
-  const parsed = parseCostFromHint(event.ticket_hint);
-  return parsed || 0;
+  const parsedTicket = parseCostFromHint(event.ticket_hint);
+  if (parsedTicket) return parsedTicket;
+
+  // Check restaurant price range for dining activities
+  if (event.dishes && event.dishes.length > 0) {
+    for (const d of event.dishes) {
+      if (d.restaurant?.price_range) {
+        const parsedFood = parseCostFromHint(d.restaurant.price_range);
+        if (parsedFood) return parsedFood;
+      }
+    }
+  }
+
+  // Check transport hint for train/bus fares
+  if (event.transport_hint) {
+    const parsedTransport = parseCostFromHint(event.transport_hint);
+    if (parsedTransport) return parsedTransport;
+  }
+
+  return 0;
 }
 
 export function getHotelCostRmb(hotel?: HotelInfo | null): number {
@@ -85,7 +120,32 @@ export function getHotelCostRmb(hotel?: HotelInfo | null): number {
     return hotel.cost_rmb;
   }
   const parsed = parseCostFromHint(hotel.price_hint);
-  return parsed || 0;
+  if (parsed) return parsed;
+  // If hotel has a name and no cost specified, use realistic standard 3-4 star baseline (280 RMB/night)
+  if (hotel.name_vn) return 280;
+  return 0;
+}
+
+/**
+ * Automatically infers category for an event if not explicitly specified
+ */
+export function inferEventCategory(event: ActivityEvent): string {
+  if (event.cost_category) return event.cost_category;
+  const title = (event.activity_title || "").toLowerCase();
+  const desc = (event.description || "").toLowerCase();
+  const hint = (event.transport_hint || "").toLowerCase();
+
+  if (event.dishes && event.dishes.length > 0) return "food";
+  if (/lẩu|nướng|món|ẩm thực|nhà hàng|quán ăn|ăn tối|ăn trưa|cà phê|trà sữa|mì /i.test(title + " " + desc)) {
+    return "food";
+  }
+  if (event.transport_detail || /tàu|metro|subway|taxi|didi|xe buýt|xe khách|chuyến bay|cáp treo/i.test(title + " " + hint)) {
+    return "transport";
+  }
+  if (/mua sắm|quà|chợ đêm|phố đi bộ/i.test(title)) {
+    return "shopping";
+  }
+  return "ticket";
 }
 
 export function calculateTripBudgetSummary(trip: TripDocument): TripBudgetSummary {
@@ -95,13 +155,15 @@ export function calculateTripBudgetSummary(trip: TripDocument): TripBudgetSummar
   let customSpentRmb = 0;
 
   const categoriesMap: Record<string, { totalRmb: number; count: number }> = {
-    ticket: { totalRmb: 0, count: 0 },
     hotel: { totalRmb: 0, count: 0 },
+    food: { totalRmb: 0, count: 0 },
+    transport: { totalRmb: 0, count: 0 },
+    ticket: { totalRmb: 0, count: 0 },
     flight: { totalRmb: 0, count: 0 },
+    shopping: { totalRmb: 0, count: 0 },
     visa: { totalRmb: 0, count: 0 },
     esim: { totalRmb: 0, count: 0 },
     insurance: { totalRmb: 0, count: 0 },
-    shopping: { totalRmb: 0, count: 0 },
     other: { totalRmb: 0, count: 0 },
   };
 
@@ -121,7 +183,7 @@ export function calculateTripBudgetSummary(trip: TripDocument): TripBudgetSummar
             dayActRmb += cost;
             activitiesSpentRmb += cost;
 
-            const cat = evt.cost_category || "ticket";
+            const cat = inferEventCategory(evt);
             if (!categoriesMap[cat]) categoriesMap[cat] = { totalRmb: 0, count: 0 };
             categoriesMap[cat].totalRmb += cost;
             categoriesMap[cat].count += 1;
@@ -183,15 +245,47 @@ export function calculateTripBudgetSummary(trip: TripDocument): TripBudgetSummar
       const info = CATEGORY_LABELS[catKey] || CATEGORY_LABELS.other;
       const totalRmb = categoriesMap[catKey].totalRmb;
       return {
-        category: catKey as any,
+        category: catKey,
         categoryLabel: info.label,
         totalRmb,
         totalVnd: totalRmb * exchangeRate,
         count: categoriesMap[catKey].count,
         color: info.color,
+        hexColor: info.hexColor,
       };
     })
-    .filter((cat) => cat.totalRmb > 0);
+    .filter((cat) => cat.totalRmb > 0)
+    .sort((a, b) => b.totalRmb - a.totalRmb);
+
+  // Compute category budget statuses and overspending detection
+  const categoryCaps = trip.category_budget_caps || {};
+  const categoryStatuses: CategoryBudgetStatus[] = categoryBreakdowns.map((cat) => {
+    const cap = categoryCaps[cat.category];
+    const capRmb = cap !== undefined ? cap : undefined;
+    const capVnd = capRmb !== undefined ? capRmb * exchangeRate : undefined;
+    const percentUsed = capRmb && capRmb > 0 ? Math.round((cat.totalRmb / capRmb) * 100) : 0;
+    const isOver = Boolean(capRmb && cat.totalRmb > capRmb);
+    const overRmb = isOver && capRmb ? cat.totalRmb - capRmb : 0;
+
+    let status: "normal" | "warning" | "danger" = "normal";
+    if (percentUsed > 100) status = "danger";
+    else if (percentUsed >= 80) status = "warning";
+
+    return {
+      category: cat.category,
+      categoryLabel: cat.categoryLabel,
+      spentRmb: cat.totalRmb,
+      spentVnd: cat.totalVnd,
+      budgetCapRmb: capRmb,
+      budgetCapVnd: capVnd,
+      percentUsed,
+      isOverBudget: isOver,
+      overAmountRmb: overRmb,
+      overAmountVnd: overRmb * exchangeRate,
+      status,
+      hexColor: cat.hexColor,
+    };
+  });
 
   return {
     totalSpentRmb,
@@ -205,5 +299,6 @@ export function calculateTripBudgetSummary(trip: TripDocument): TripBudgetSummar
     exchangeRate,
     categoryBreakdowns,
     daySummaries,
+    categoryStatuses,
   };
 }

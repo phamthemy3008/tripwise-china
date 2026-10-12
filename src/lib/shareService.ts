@@ -1,5 +1,6 @@
 import { TripDocument } from "../types/itinerary";
 import { SAMPLE_TRIPS } from "../data/sampleTrips";
+import { healStationNamesInTrip } from "./firestoreTrips";
 
 const CACHED_SHARED_TRIPS_KEY = "tripwise_cached_shared_trips";
 
@@ -50,13 +51,15 @@ export async function shareTrip(trip: TripDocument): Promise<ShareResult> {
 export async function fetchSharedTrip(shareId: string): Promise<TripDocument | null> {
   if (!shareId) return null;
 
+  let loadedTrip: TripDocument | null = null;
+
   // 1. Try public server API /api/share/:id
   try {
     const res = await fetch(`/api/share/${encodeURIComponent(shareId)}`);
     if (res.ok) {
       const json = await res.json();
       if (json.success && json.data) {
-        return json.data as TripDocument;
+        loadedTrip = json.data as TripDocument;
       }
     }
   } catch (err) {
@@ -64,49 +67,61 @@ export async function fetchSharedTrip(shareId: string): Promise<TripDocument | n
   }
 
   // 2. Try /api/trips/:id
-  try {
-    const res = await fetch(`/api/trips/${encodeURIComponent(shareId)}`);
-    if (res.ok) {
-      const json = await res.json();
-      if (json.success && json.data) {
-        return json.data as TripDocument;
+  if (!loadedTrip) {
+    try {
+      const res = await fetch(`/api/trips/${encodeURIComponent(shareId)}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          loadedTrip = json.data as TripDocument;
+        }
       }
+    } catch (err) {
+      console.warn("Could not fetch trip from /api/trips:", err);
     }
-  } catch (err) {
-    console.warn("Could not fetch trip from /api/trips:", err);
   }
 
   // 3. Check sample trips
-  const sample = SAMPLE_TRIPS.find((s) => s.id === shareId);
-  if (sample) return sample;
+  if (!loadedTrip) {
+    const sample = SAMPLE_TRIPS.find((s) => s.id === shareId);
+    if (sample) loadedTrip = sample;
+  }
 
   // 4. Check local storage cache of shared trips
-  try {
-    const cachedMap = JSON.parse(localStorage.getItem(CACHED_SHARED_TRIPS_KEY) || "{}");
-    if (cachedMap[shareId]) {
-      return cachedMap[shareId] as TripDocument;
+  if (!loadedTrip) {
+    try {
+      const cachedMap = JSON.parse(localStorage.getItem(CACHED_SHARED_TRIPS_KEY) || "{}");
+      if (cachedMap[shareId]) {
+        loadedTrip = cachedMap[shareId] as TripDocument;
+      }
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
   }
 
   // 5. Check user-saved trips across any local accounts
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && (key.startsWith("tripwise_user_trips_") || key === "tripwise_china_trips")) {
-        const val = localStorage.getItem(key);
-        if (val) {
-          const list = JSON.parse(val);
-          if (Array.isArray(list)) {
-            const match = list.find((t: any) => t.id === shareId);
-            if (match) return match as TripDocument;
+  if (!loadedTrip) {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith("tripwise_user_trips_") || key === "tripwise_china_trips")) {
+          const val = localStorage.getItem(key);
+          if (val) {
+            const list = JSON.parse(val);
+            if (Array.isArray(list)) {
+              const match = list.find((t: any) => t.id === shareId);
+              if (match) loadedTrip = match as TripDocument;
+            }
           }
         }
       }
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
+  }
+
+  if (loadedTrip) {
+    return healStationNamesInTrip(loadedTrip).trip;
   }
 
   return null;

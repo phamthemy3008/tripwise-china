@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Toaster, toast } from "sonner";
-import { TripDocument, ActivityEvent } from "./types/itinerary";
+import { TripDocument, ActivityEvent, TransportDetail } from "./types/itinerary";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { LoginScreen } from "./components/LoginScreen";
 import {
@@ -9,6 +9,7 @@ import {
   deleteUserTrip,
   resetTripsToFullSample,
   upgradeTripsWithFullSample,
+  healStationNamesInTrip,
 } from "./lib/firestoreTrips";
 import { SAMPLE_TRIPS } from "./data/sampleTrips";
 import { DayTabs, checkIsToday } from "./components/DayTabs";
@@ -22,6 +23,11 @@ import { ShareModal } from "./components/ShareModal";
 import { fetchSharedTrip } from "./lib/shareService";
 import { BudgetTrackerModal } from "./components/BudgetTrackerModal";
 import { CostEditModal } from "./components/CostEditModal";
+import { ActivityEditModal } from "./components/ActivityEditModal";
+import { DayEditModal } from "./components/DayEditModal";
+import { TripInfoEditModal } from "./components/TripInfoEditModal";
+import { StationEditModal } from "./components/StationEditModal";
+import { DayPlan } from "./types/itinerary";
 import { calculateTripBudgetSummary } from "./lib/budgetUtils";
 import {
   Compass,
@@ -55,6 +61,7 @@ import {
   RotateCcw,
   Wallet,
   Calculator,
+  Edit2,
 } from "lucide-react";
 
 function MainApp() {
@@ -103,6 +110,34 @@ function MainApp() {
     isOpen: false,
     dayIndex: 0,
   });
+
+  // Direct itinerary editing states
+  const [activityEditTarget, setActivityEditTarget] = useState<{
+    isOpen: boolean;
+    dayIndex: number;
+    eventIndex: number | null; // null means adding a new event
+  }>({
+    isOpen: false,
+    dayIndex: 0,
+    eventIndex: null,
+  });
+
+  const [dayEditTarget, setDayEditTarget] = useState<{
+    isOpen: boolean;
+    dayIndex: number;
+  }>({
+    isOpen: false,
+    dayIndex: 0,
+  });
+
+  const [isTripInfoEditOpen, setIsTripInfoEditOpen] = useState<boolean>(false);
+
+  // Direct station (Metro / Train departure & arrival) edit state
+  const [stationEditTarget, setStationEditTarget] = useState<{
+    isOpen: boolean;
+    dayIndex: number;
+    eventIndex: number;
+  } | null>(null);
 
   // Shared trip guest viewing states
   const [sharedTrip, setSharedTrip] = useState<TripDocument | null>(null);
@@ -350,21 +385,166 @@ function MainApp() {
     }
   };
 
-  const handleUpdateTripBudget = async (updatedTrip: TripDocument) => {
+  const handleSaveUpdatedTrip = async (updatedTrip: TripDocument) => {
+    const tripToSave: TripDocument = {
+      ...updatedTrip,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (isGuestMode) {
+      setSharedTrip(tripToSave);
+      toast.info("Đã lưu thay đổi vào bản xem hiện tại. Hãy bấm 'Lưu bản sao vào tài khoản' để lưu vĩnh viễn.");
+      return;
+    }
+
     if (user) {
       try {
-        const updatedList = await saveUserTrip(user.uid, updatedTrip);
+        const updatedList = await saveUserTrip(user.uid, tripToSave);
         setTrips(updatedList);
       } catch (e) {
-        console.error("Failed to save trip budget to Firestore:", e);
+        console.error("Failed to save trip to Firestore:", e);
+        setTrips((prev) => prev.map((t) => (t.id === tripToSave.id ? tripToSave : t)));
       }
     } else {
       setTrips((prev) => {
-        const next = prev.map((t) => (t.id === updatedTrip.id ? updatedTrip : t));
+        const next = prev.map((t) => (t.id === tripToSave.id ? tripToSave : t));
         localStorage.setItem("tripwise_anonymous_trips", JSON.stringify(next));
         return next;
       });
     }
+  };
+
+  const handleUpdateTripBudget = handleSaveUpdatedTrip;
+
+  // Direct Activity Save (Add new or Update existing)
+  const handleSaveActivity = (updatedEvent: ActivityEvent) => {
+    if (!currentTrip) return;
+    const { dayIndex, eventIndex } = activityEditTarget;
+    if (dayIndex < 0 || dayIndex >= currentTrip.days.length) return;
+
+    const updatedDays = [...currentTrip.days];
+    const targetDay = { ...updatedDays[dayIndex] };
+
+    if (eventIndex === null) {
+      // Add new activity
+      targetDay.events = [...targetDay.events, updatedEvent];
+    } else {
+      // Update existing activity
+      const updatedEvents = [...targetDay.events];
+      updatedEvents[eventIndex] = updatedEvent;
+      targetDay.events = updatedEvents;
+    }
+
+    updatedDays[dayIndex] = targetDay;
+    const updatedTrip: TripDocument = {
+      ...currentTrip,
+      days: updatedDays,
+    };
+    handleSaveUpdatedTrip(updatedTrip);
+  };
+
+  // Direct Activity Delete
+  const handleDeleteActivity = (dayIndex: number, eventIndex: number) => {
+    if (!currentTrip) return;
+    const updatedDays = [...currentTrip.days];
+    const targetDay = { ...updatedDays[dayIndex] };
+    targetDay.events = targetDay.events.filter((_, i) => i !== eventIndex);
+    updatedDays[dayIndex] = targetDay;
+
+    const updatedTrip: TripDocument = {
+      ...currentTrip,
+      days: updatedDays,
+    };
+    handleSaveUpdatedTrip(updatedTrip);
+    toast.success("Đã xóa hoạt động khỏi lịch trình");
+  };
+
+  // Reorder Activity Up / Down
+  const handleMoveActivity = (dayIndex: number, eventIndex: number, direction: "up" | "down") => {
+    if (!currentTrip) return;
+    const updatedDays = [...currentTrip.days];
+    const targetDay = { ...updatedDays[dayIndex] };
+    const events = [...targetDay.events];
+
+    const targetIdx = direction === "up" ? eventIndex - 1 : eventIndex + 1;
+    if (targetIdx < 0 || targetIdx >= events.length) return;
+
+    const temp = events[eventIndex];
+    events[eventIndex] = events[targetIdx];
+    events[targetIdx] = temp;
+
+    targetDay.events = events;
+    updatedDays[dayIndex] = targetDay;
+
+    const updatedTrip: TripDocument = {
+      ...currentTrip,
+      days: updatedDays,
+    };
+    handleSaveUpdatedTrip(updatedTrip);
+
+    setActivityEditTarget((prev) => ({
+      ...prev,
+      eventIndex: targetIdx,
+    }));
+    toast.success(`Đã chuyển hoạt động ${direction === "up" ? "lên trước" : "xuống sau"}`);
+  };
+
+  // Direct Day Save (Title, City, Date, Hotel)
+  const handleSaveDayPlan = (dayIndex: number, updatedDayData: Partial<DayPlan>) => {
+    if (!currentTrip) return;
+    const updatedDays = [...currentTrip.days];
+    updatedDays[dayIndex] = {
+      ...updatedDays[dayIndex],
+      ...updatedDayData,
+    };
+    const updatedTrip: TripDocument = {
+      ...currentTrip,
+      days: updatedDays,
+    };
+    handleSaveUpdatedTrip(updatedTrip);
+  };
+
+  // Direct Trip Title & Duration Save
+  const handleSaveTripInfo = (title: string, duration: string) => {
+    if (!currentTrip) return;
+    const updatedTrip: TripDocument = {
+      ...currentTrip,
+      trip_title: title,
+      duration,
+    };
+    handleSaveUpdatedTrip(updatedTrip);
+  };
+
+  // Direct Station (Metro / Train departure & arrival) Save
+  const handleSaveStations = (
+    updatedTransportDetail: TransportDetail,
+    updatedHint?: string
+  ) => {
+    if (!stationEditTarget || !currentTrip) return;
+    const { dayIndex, eventIndex } = stationEditTarget;
+
+    const updatedDays = [...currentTrip.days];
+    const targetDay = { ...updatedDays[dayIndex] };
+    const targetEvents = [...targetDay.events];
+    const targetEvent = { ...targetEvents[eventIndex] };
+
+    targetEvent.transport_detail = updatedTransportDetail;
+    if (updatedHint) {
+      targetEvent.transport_hint = updatedHint;
+    }
+
+    targetEvents[eventIndex] = targetEvent;
+    targetDay.events = targetEvents;
+    updatedDays[dayIndex] = targetDay;
+
+    const updatedTrip: TripDocument = {
+      ...currentTrip,
+      days: updatedDays,
+      updated_at: new Date().toISOString(),
+    };
+
+    handleSaveUpdatedTrip(updatedTrip);
+    setStationEditTarget(null);
   };
 
   const handleSaveCost = (
@@ -405,7 +585,7 @@ function MainApp() {
       updated_at: new Date().toISOString(),
     };
 
-    handleUpdateTripBudget(updatedTrip);
+    handleSaveUpdatedTrip(updatedTrip);
   };
 
   const handleDeleteCurrentTrip = async (tripId: string) => {
@@ -437,6 +617,19 @@ function MainApp() {
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Đã tải xuống file JSON lịch trình!");
+  };
+
+  const handleHealStationData = () => {
+    if (!currentTrip) return;
+    const { trip: healed, changed } = healStationNamesInTrip(currentTrip);
+    handleSaveUpdatedTrip(healed);
+    if (changed) {
+      toast.success("Đã đồng bộ và chuẩn hóa chính xác tên tất cả các ga tàu & metro!", {
+        description: "Bao gồm Ga Trùng Khánh Bắc, Ga Lý Tử Bá, Ga Thanh Thành Sơn, Ga Ly Đôi, Ga Lạc Sơn, Ga Nga Mi Sơn, Ga Sân bay Thiên Phủ...",
+      });
+    } else {
+      toast.info("Tên tất cả các ga tàu & tuyến metro trong lịch trình đã hoàn toàn chuẩn xác!");
+    }
   };
 
   const handleShareSummary = () => {
@@ -780,9 +973,19 @@ function MainApp() {
                     </span>
                   </div>
 
-                  <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-white leading-tight">
-                    {currentTrip.trip_title}
-                  </h1>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-white leading-tight">
+                      {currentTrip.trip_title}
+                    </h1>
+                    <button
+                      type="button"
+                      onClick={() => setIsTripInfoEditOpen(true)}
+                      className="p-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-amber-400 border border-slate-700/80 transition-colors cursor-pointer"
+                      title="Chỉnh sửa tên và thời lượng chuyến đi"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Quick actions for current trip */}
@@ -815,6 +1018,16 @@ function MainApp() {
                   >
                     <Printer className="w-3.5 h-3.5 text-emerald-400" />
                     <span className="text-[11px]">In / PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleHealStationData}
+                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                    title="Đồng bộ & chuẩn hóa lại tên các ga tàu cao tốc, ga metro và tên tiếng Trung theo dữ liệu chính xác nhất"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="text-[11px] hidden sm:inline">Chuẩn hóa ga</span>
                   </button>
                 </div>
               </div>
@@ -937,10 +1150,21 @@ function MainApp() {
                           <Calendar className="w-3.5 h-3.5" />
                           Ngày {dayPlan.day_number}: {dayPlan.date || ""}
                         </span>
-                        <span className="inline-flex items-center gap-1 text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-lg">
-                          <MapPin className="w-3.5 h-3.5 text-red-500" />
-                          {dayPlan.city}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setDayEditTarget({ isOpen: true, dayIndex: dayIdx })}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-amber-600 dark:text-slate-300 dark:hover:text-amber-400 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                            title="Chỉnh sửa thông tin ngày & khách sạn"
+                          >
+                            <Edit2 className="w-3 h-3 text-amber-500" />
+                            <span>Sửa Ngày</span>
+                          </button>
+                          <span className="inline-flex items-center gap-1 text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-lg">
+                            <MapPin className="w-3.5 h-3.5 text-red-500" />
+                            {dayPlan.city}
+                          </span>
+                        </div>
                       </div>
 
                       <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white leading-snug">
@@ -960,15 +1184,48 @@ function MainApp() {
                         onOpenCostEdit={() =>
                           setCostEditTarget({ isOpen: true, dayIndex: dayIdx, isHotel: true })
                         }
+                        onEditHotel={() =>
+                          setDayEditTarget({ isOpen: true, dayIndex: dayIdx })
+                        }
                       />
                     )}
 
                     {/* Timeline Events Section */}
                     <div>
-                      <div className="flex items-center justify-between mb-3 px-1">
+                      <div className="flex items-center justify-between mb-3 px-1 flex-wrap gap-2">
                         <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                           Lịch trình Ngày {dayPlan.day_number} ({dayPlan.events.length} hoạt động)
                         </h3>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setActivityEditTarget({
+                                isOpen: true,
+                                dayIndex: dayIdx,
+                                eventIndex: null,
+                              })
+                            }
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95 no-print"
+                            title="Thêm một hoạt động mới vào ngày này"
+                          >
+                            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                            <span>+ Thêm Hoạt Động</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedDayNumber(dayPlan.day_number);
+                              setIsSuggestModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs font-semibold transition-all cursor-pointer no-print"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                            <span className="hidden sm:inline">AI Gợi Ý</span>
+                          </button>
+                        </div>
                       </div>
 
                       <div className="space-y-1">
@@ -982,6 +1239,20 @@ function MainApp() {
                             previousEvent={idx > 0 ? dayPlan.events[idx - 1] : undefined}
                             onOpenCostEdit={() =>
                               setCostEditTarget({ isOpen: true, dayIndex: dayIdx, eventIndex: idx })
+                            }
+                            onEditActivity={() =>
+                              setActivityEditTarget({
+                                isOpen: true,
+                                dayIndex: dayIdx,
+                                eventIndex: idx,
+                              })
+                            }
+                            onEditStations={() =>
+                              setStationEditTarget({
+                                isOpen: true,
+                                dayIndex: dayIdx,
+                                eventIndex: idx,
+                              })
                             }
                           />
                         ))}
@@ -1001,10 +1272,29 @@ function MainApp() {
                         <Calendar className="w-3.5 h-3.5" />
                         {activeDayPlan.date || `Ngày ${activeDayPlan.day_number}`}
                       </span>
-                      <span className="inline-flex items-center gap-1 text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-lg">
-                        <MapPin className="w-3.5 h-3.5 text-red-500" />
-                        {activeDayPlan.city}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const activeIdx = currentTrip.days.findIndex(
+                              (d) => d.day_number === activeDayPlan.day_number
+                            );
+                            setDayEditTarget({
+                              isOpen: true,
+                              dayIndex: activeIdx >= 0 ? activeIdx : 0,
+                            });
+                          }}
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-amber-600 dark:text-slate-300 dark:hover:text-amber-400 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                          title="Chỉnh sửa thông tin ngày & khách sạn"
+                        >
+                          <Edit2 className="w-3 h-3 text-amber-500" />
+                          <span>Sửa Ngày</span>
+                        </button>
+                        <span className="inline-flex items-center gap-1 text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-lg">
+                          <MapPin className="w-3.5 h-3.5 text-red-500" />
+                          {activeDayPlan.city}
+                        </span>
+                      </div>
                     </div>
 
                     <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white leading-snug">
@@ -1033,6 +1323,15 @@ function MainApp() {
                           isHotel: true,
                         });
                       }}
+                      onEditHotel={() => {
+                        const activeIdx = currentTrip.days.findIndex(
+                          (d) => d.day_number === activeDayPlan.day_number
+                        );
+                        setDayEditTarget({
+                          isOpen: true,
+                          dayIndex: activeIdx >= 0 ? activeIdx : 0,
+                        });
+                      }}
                     />
                   )}
 
@@ -1043,48 +1342,104 @@ function MainApp() {
                         Lịch trình chi tiết trong ngày ({activeDayPlan.events.length} hoạt động)
                       </h3>
 
-                      <button
-                        type="button"
-                        onClick={() => setIsSuggestModalOpen(true)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 text-xs font-black shadow-xs hover:brightness-105 transition-all cursor-pointer active:scale-95 no-print"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>Gợi ý thêm điểm đến</span>
-                      </button>
-                    </div>
-
-                    <div className="space-y-1">
-                      {activeDayPlan.events.map((event, idx) => (
-                        <TimelineCard
-                          key={idx}
-                          event={event}
-                          index={idx}
-                          cityName={activeDayPlan.city}
-                          hotel={activeDayPlan.hotel}
-                          previousEvent={idx > 0 ? activeDayPlan.events[idx - 1] : undefined}
-                          onOpenCostEdit={() => {
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
                             const activeIdx = currentTrip.days.findIndex(
                               (d) => d.day_number === activeDayPlan.day_number
                             );
-                            setCostEditTarget({
+                            setActivityEditTarget({
                               isOpen: true,
                               dayIndex: activeIdx >= 0 ? activeIdx : 0,
-                              eventIndex: idx,
+                              eventIndex: null,
                             });
                           }}
-                        />
-                      ))}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black shadow-xs transition-all cursor-pointer active:scale-95 no-print"
+                          title="Thêm một hoạt động mới vào ngày này"
+                        >
+                          <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span>+ Thêm Hoạt Động</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setIsSuggestModalOpen(true)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs font-semibold transition-all cursor-pointer active:scale-95 no-print"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                          <span>AI Gợi Ý</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      {activeDayPlan.events.map((event, idx) => {
+                        const activeIdx = currentTrip.days.findIndex(
+                          (d) => d.day_number === activeDayPlan.day_number
+                        );
+                        const dayIdx = activeIdx >= 0 ? activeIdx : 0;
+                        return (
+                          <TimelineCard
+                            key={idx}
+                            event={event}
+                            index={idx}
+                            cityName={activeDayPlan.city}
+                            hotel={activeDayPlan.hotel}
+                            previousEvent={idx > 0 ? activeDayPlan.events[idx - 1] : undefined}
+                            onOpenCostEdit={() => {
+                              setCostEditTarget({
+                                isOpen: true,
+                                dayIndex: dayIdx,
+                                eventIndex: idx,
+                              });
+                            }}
+                            onEditActivity={() => {
+                              setActivityEditTarget({
+                                isOpen: true,
+                                dayIndex: dayIdx,
+                                eventIndex: idx,
+                              });
+                            }}
+                            onEditStations={() => {
+                              setStationEditTarget({
+                                isOpen: true,
+                                dayIndex: dayIdx,
+                                eventIndex: idx,
+                              });
+                            }}
+                          />
+                        );
+                      })}
                     </div>
 
                     {/* Add more activity prompt banner at bottom */}
-                    <div className="mt-4 pt-1 no-print">
+                    <div className="mt-4 pt-1 flex flex-col sm:flex-row gap-2.5 no-print">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const activeIdx = currentTrip.days.findIndex(
+                            (d) => d.day_number === activeDayPlan.day_number
+                          );
+                          setActivityEditTarget({
+                            isOpen: true,
+                            dayIndex: activeIdx >= 0 ? activeIdx : 0,
+                            eventIndex: null,
+                          });
+                        }}
+                        className="flex-1 p-3.5 rounded-2xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 dark:text-amber-300 transition-all text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                      >
+                        <Plus className="w-4 h-4 text-amber-500 stroke-[2.5]" />
+                        <span>+ Thêm trực tiếp hoạt động vào Ngày {activeDayPlan.day_number}</span>
+                      </button>
+
                       <button
                         type="button"
                         onClick={() => setIsSuggestModalOpen(true)}
-                        className="w-full p-4 rounded-2xl border-2 border-dashed border-amber-300 dark:border-amber-700/60 bg-amber-50/50 dark:bg-amber-950/15 hover:bg-amber-100/60 dark:hover:bg-amber-950/30 text-amber-900 dark:text-amber-200 transition-all text-xs font-bold flex items-center justify-center gap-2 cursor-pointer group"
+                        className="p-3.5 rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900/60 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-all text-xs font-bold flex items-center justify-center gap-2 cursor-pointer group"
                       >
                         <Sparkles className="w-4 h-4 text-amber-500 group-hover:rotate-12 transition-transform" />
-                        <span>Bạn muốn khám phá thêm điểm nào tại <strong>{activeDayPlan.city}</strong>? Bấm để AI gợi ý!</span>
+                        <span>AI Gợi ý thêm điểm tại <strong>{activeDayPlan.city}</strong></span>
                       </button>
                     </div>
                   </div>
@@ -1386,6 +1741,97 @@ function MainApp() {
           onSave={handleSaveCost}
         />
       )}
+
+      {/* Direct Activity Edit Modal */}
+      {currentTrip && activityEditTarget.isOpen && (
+        <ActivityEditModal
+          isOpen={activityEditTarget.isOpen}
+          onClose={() => setActivityEditTarget({ ...activityEditTarget, isOpen: false })}
+          dayNumber={currentTrip.days[activityEditTarget.dayIndex]?.day_number || 1}
+          cityName={currentTrip.days[activityEditTarget.dayIndex]?.city || ""}
+          eventIndex={activityEditTarget.eventIndex}
+          initialEvent={
+            typeof activityEditTarget.eventIndex === "number"
+              ? currentTrip.days[activityEditTarget.dayIndex]?.events[activityEditTarget.eventIndex]
+              : undefined
+          }
+          exchangeRate={currentTrip.exchange_rate_rmb_vnd || 3500}
+          canMoveUp={
+            typeof activityEditTarget.eventIndex === "number" &&
+            activityEditTarget.eventIndex > 0
+          }
+          canMoveDown={
+            typeof activityEditTarget.eventIndex === "number" &&
+            activityEditTarget.eventIndex <
+              (currentTrip.days[activityEditTarget.dayIndex]?.events?.length || 0) - 1
+          }
+          onSave={handleSaveActivity}
+          onDelete={
+            typeof activityEditTarget.eventIndex === "number"
+              ? () =>
+                  handleDeleteActivity(
+                    activityEditTarget.dayIndex,
+                    activityEditTarget.eventIndex!
+                  )
+              : undefined
+          }
+          onMoveUp={
+            typeof activityEditTarget.eventIndex === "number"
+              ? () =>
+                  handleMoveActivity(
+                    activityEditTarget.dayIndex,
+                    activityEditTarget.eventIndex!,
+                    "up"
+                  )
+              : undefined
+          }
+          onMoveDown={
+            typeof activityEditTarget.eventIndex === "number"
+              ? () =>
+                  handleMoveActivity(
+                    activityEditTarget.dayIndex,
+                    activityEditTarget.eventIndex!,
+                    "down"
+                  )
+              : undefined
+          }
+        />
+      )}
+
+      {/* Direct Day Edit Modal */}
+      {currentTrip && dayEditTarget.isOpen && currentTrip.days[dayEditTarget.dayIndex] && (
+        <DayEditModal
+          isOpen={dayEditTarget.isOpen}
+          onClose={() => setDayEditTarget({ ...dayEditTarget, isOpen: false })}
+          dayPlan={currentTrip.days[dayEditTarget.dayIndex]}
+          exchangeRate={currentTrip.exchange_rate_rmb_vnd || 3500}
+          onSave={(updatedDay) => handleSaveDayPlan(dayEditTarget.dayIndex, updatedDay)}
+        />
+      )}
+
+      {/* Direct Trip Title & Duration Edit Modal */}
+      {currentTrip && isTripInfoEditOpen && (
+        <TripInfoEditModal
+          isOpen={isTripInfoEditOpen}
+          onClose={() => setIsTripInfoEditOpen(false)}
+          trip={currentTrip}
+          onSave={handleSaveTripInfo}
+        />
+      )}
+
+      {/* Direct Station Edit Modal (Metro & High-Speed Train Departure/Arrival) */}
+      {currentTrip &&
+        stationEditTarget?.isOpen &&
+        currentTrip.days[stationEditTarget.dayIndex]?.events[stationEditTarget.eventIndex] && (
+          <StationEditModal
+            key={`station-modal-${stationEditTarget.dayIndex}-${stationEditTarget.eventIndex}`}
+            isOpen={stationEditTarget.isOpen}
+            onClose={() => setStationEditTarget(null)}
+            event={currentTrip.days[stationEditTarget.dayIndex].events[stationEditTarget.eventIndex]}
+            cityName={currentTrip.days[stationEditTarget.dayIndex]?.city || ""}
+            onSaveStations={handleSaveStations}
+          />
+        )}
 
       {/* Global Toast Container */}
       <Toaster position="top-center" richColors />

@@ -16,18 +16,22 @@ import {
   Eye,
   X,
   CreditCard,
+  ShieldCheck,
+  Edit2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ActivityEvent, HotelInfo } from "../types/itinerary.js";
 import { parseTransportEvent, ParsedTransport } from "../lib/transportParser.js";
 import { CopyChip } from "./CopyChip.js";
 import { openAppScheme } from "../lib/deepLink.js";
+import { AppDiagnosticModal } from "./AppDiagnosticModal.js";
 
 interface TransportGuideProps {
   event: ActivityEvent;
   hotel?: HotelInfo;
   cityName?: string;
   previousEvent?: ActivityEvent;
+  onEditTransport?: () => void;
 }
 
 export const TransportGuide: React.FC<TransportGuideProps> = ({
@@ -35,9 +39,11 @@ export const TransportGuide: React.FC<TransportGuideProps> = ({
   hotel,
   cityName,
   previousEvent,
+  onEditTransport,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showDriverCard, setShowDriverCard] = useState(false);
+  const [showDiagnosticModal, setShowDiagnosticModal] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const parsed: ParsedTransport = parseTransportEvent(
@@ -75,11 +81,13 @@ export const TransportGuide: React.FC<TransportGuideProps> = ({
   const handleOpenMetroMan = (e: React.MouseEvent) => {
     e.stopPropagation();
     const stationZh = parsed.metro?.arrivalStationZh || `${event.place_zh}站`;
+    const stationPinyin = parsed.metro?.arrivalStationPinyin || event.place_name;
     const line = parsed.metro?.line || "Metro";
     
-    // Copy destination station in Chinese
+    // Copy destination station in both Pinyin and Chinese for easy searching in MetroMan
+    const copyText = `${stationPinyin} ${stationZh}`;
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(stationZh).catch(() => {});
+      navigator.clipboard.writeText(copyText).catch(() => {});
     }
 
     const metroScheme = "metroman://";
@@ -88,7 +96,7 @@ export const TransportGuide: React.FC<TransportGuideProps> = ({
     const appStoreUrl = "https://apps.apple.com/app/metroman-china-subway/id466351037";
 
     toast.info("Đang mở MetroMan / Bản đồ Subway...", {
-      description: `Ga đến: "${stationZh}" (${line}) - Đã tự động sao chép chữ Hán`,
+      description: `Ga đến: "${copyText}" (${line}) - Đã tự động sao chép Pinyin + Chữ Hán`,
       duration: 4000,
       action: {
         label: "Bản đồ Subway Web",
@@ -238,8 +246,23 @@ export const TransportGuide: React.FC<TransportGuideProps> = ({
           </div>
         </div>
 
-        {/* Right side toggle indicator */}
+        {/* Right side toggle indicator & Edit station button */}
         <div className="flex items-center gap-2 shrink-0">
+          {onEditTransport && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEditTransport();
+              }}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 border border-amber-500/30 transition-all cursor-pointer active:scale-95"
+              title="Sửa tên ga đi và ga đến của chặng này"
+            >
+              <Edit2 className="w-3 h-3 text-amber-500" />
+              <span>Sửa ga</span>
+            </button>
+          )}
+
           <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hidden sm:inline">
             {isExpanded ? "Thu gọn" : "Chi tiết trạm & App"}
           </span>
@@ -319,83 +342,262 @@ export const TransportGuide: React.FC<TransportGuideProps> = ({
                   </span>
                 </div>
 
-                <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">
-                  Hỗ trợ tra cứu MetroMan & Amap
-                </span>
+                <div className="flex items-center gap-2">
+                  {onEditTransport && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditTransport();
+                      }}
+                      className="text-[11px] text-amber-800 dark:text-amber-300 font-bold flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/60 dark:hover:bg-amber-900/80 px-2.5 py-1 rounded-lg transition-colors cursor-pointer border border-amber-300 dark:border-amber-700/60"
+                      title="Sửa trực tiếp tên ga đi, ga đến, tuyến Metro"
+                    >
+                      <Edit2 className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                      <span>Sửa ga Metro</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setShowDiagnosticModal(true)}
+                    className="text-[11px] text-blue-600 hover:text-blue-700 dark:text-blue-400 font-semibold flex items-center gap-1 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/60 px-2.5 py-1 rounded-lg transition-colors cursor-pointer border border-blue-200/60 dark:border-blue-900/40"
+                    title="Chẩn đoán & kiểm tra phản hồi app MetroMan, Amap, Alipay..."
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                    <span>Chẩn đoán Link App</span>
+                  </button>
+                </div>
               </div>
 
               {/* Station Route visualization */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 bg-blue-50/50 dark:bg-blue-950/20 p-3 rounded-xl border border-blue-100/80 dark:border-blue-900/20">
                 {/* Ga cần đi */}
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
-                    Ga cần đi (Khởi hành)
-                  </span>
+                <div className="space-y-1.5 bg-white/80 dark:bg-slate-800/60 p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-700/50">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
+                      Ga cần đi (Khởi hành)
+                    </span>
+                    {onEditTransport && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditTransport();
+                        }}
+                        className="text-[10px] text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 transition-colors cursor-pointer"
+                        title="Sửa tên ga đi này"
+                      >
+                        <Edit2 className="w-2.5 h-2.5" />
+                        <span>Sửa ga đi</span>
+                      </button>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1.5">
                     <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                     <span className="font-semibold text-xs text-slate-800 dark:text-slate-200">
                       {parsed.metro.departureStationVn}
                     </span>
                   </div>
+
                   {parsed.metro.departureStationZh && (
-                    <div className="flex items-center gap-1 pl-3.5">
-                      <span className="font-mono text-xs font-bold text-blue-700 dark:text-blue-300">
-                        {parsed.metro.departureStationZh}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          copyToClipboard(
-                            parsed.metro!.departureStationZh,
-                            "depStation"
-                          )
-                        }
-                        className="p-1 text-slate-400 hover:text-blue-600"
-                        title="Sao chép tên ga chữ Hán"
-                      >
-                        {copiedKey === "depStation" ? (
-                          <Check className="w-3 h-3 text-emerald-500" />
-                        ) : (
-                          <Copy className="w-3 h-3" />
-                        )}
-                      </button>
+                    <div className="space-y-1 pt-1 border-t border-slate-100 dark:border-slate-700/40">
+                      {/* Pinyin Row */}
+                      {parsed.metro.departureStationPinyin && (
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-slate-400 dark:text-slate-500 font-medium">Pinyin:</span>
+                          <div className="flex items-center gap-1">
+                            <span className="font-semibold text-slate-700 dark:text-slate-300">
+                              {parsed.metro.departureStationPinyin}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                copyToClipboard(
+                                  parsed.metro!.departureStationPinyin!,
+                                  "depPinyin"
+                                )
+                              }
+                              className="p-1 text-slate-400 hover:text-blue-600 transition-colors cursor-pointer"
+                              title="Sao chép Pinyin"
+                            >
+                              {copiedKey === "depPinyin" ? (
+                                <Check className="w-3 h-3 text-emerald-500" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Hanzi Row */}
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-400 dark:text-slate-500 font-medium">Chữ Hán:</span>
+                        <div className="flex items-center gap-1">
+                          <span className="font-mono font-bold text-blue-700 dark:text-blue-300">
+                            {parsed.metro.departureStationZh}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              copyToClipboard(
+                                parsed.metro!.departureStationZh,
+                                "depStationZh"
+                              )
+                            }
+                            className="p-1 text-slate-400 hover:text-blue-600 transition-colors cursor-pointer"
+                            title="Sao chép chữ Hán"
+                          >
+                            {copiedKey === "depStationZh" ? (
+                              <Check className="w-3 h-3 text-emerald-500" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Quick copy both */}
+                      <div className="pt-0.5 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            copyToClipboard(
+                              `${parsed.metro!.departureStationPinyin || ''} ${parsed.metro!.departureStationZh}`.trim(),
+                              "depStationBoth"
+                            )
+                          }
+                          className="text-[10px] font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1 bg-blue-50 dark:bg-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/60 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
+                        >
+                          {copiedKey === "depStationBoth" ? (
+                            <>
+                              <Check className="w-2.5 h-2.5 text-emerald-500" />
+                              <span>Đã copy Pinyin + Hán</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-2.5 h-2.5" />
+                              <span>Copy Pinyin + Chữ Hán</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
 
                 {/* Ga đến */}
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
-                    Ga đến (Điểm đến)
-                  </span>
+                <div className="space-y-1.5 bg-white/80 dark:bg-slate-800/60 p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-700/50">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
+                      Ga đến (Điểm đến)
+                    </span>
+                    {onEditTransport && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditTransport();
+                        }}
+                        className="text-[10px] text-red-600 hover:text-red-700 dark:text-red-400 font-semibold flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-50 hover:bg-red-100 dark:bg-red-950/60 transition-colors cursor-pointer"
+                        title="Sửa tên ga đến này"
+                      >
+                        <Edit2 className="w-2.5 h-2.5" />
+                        <span>Sửa ga đến</span>
+                      </button>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1.5">
                     <div className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
                     <span className="font-semibold text-xs text-slate-800 dark:text-slate-200">
                       {parsed.metro.arrivalStationVn}
                     </span>
                   </div>
+
                   {parsed.metro.arrivalStationZh && (
-                    <div className="flex items-center gap-1 pl-3.5">
-                      <span className="font-mono text-xs font-bold text-red-600 dark:text-red-400">
-                        {parsed.metro.arrivalStationZh}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          copyToClipboard(
-                            parsed.metro!.arrivalStationZh,
-                            "arrStation"
-                          )
-                        }
-                        className="p-1 text-slate-400 hover:text-red-500"
-                        title="Sao chép tên ga chữ Hán"
-                      >
-                        {copiedKey === "arrStation" ? (
-                          <Check className="w-3 h-3 text-emerald-500" />
-                        ) : (
-                          <Copy className="w-3 h-3" />
-                        )}
-                      </button>
+                    <div className="space-y-1 pt-1 border-t border-slate-100 dark:border-slate-700/40">
+                      {/* Pinyin Row */}
+                      {parsed.metro.arrivalStationPinyin && (
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-slate-400 dark:text-slate-500 font-medium">Pinyin:</span>
+                          <div className="flex items-center gap-1">
+                            <span className="font-semibold text-slate-700 dark:text-slate-300">
+                              {parsed.metro.arrivalStationPinyin}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                copyToClipboard(
+                                  parsed.metro!.arrivalStationPinyin!,
+                                  "arrPinyin"
+                                )
+                              }
+                              className="p-1 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+                              title="Sao chép Pinyin"
+                            >
+                              {copiedKey === "arrPinyin" ? (
+                                <Check className="w-3 h-3 text-emerald-500" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Hanzi Row */}
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-400 dark:text-slate-500 font-medium">Chữ Hán:</span>
+                        <div className="flex items-center gap-1">
+                          <span className="font-mono font-bold text-red-600 dark:text-red-400">
+                            {parsed.metro.arrivalStationZh}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              copyToClipboard(
+                                parsed.metro!.arrivalStationZh,
+                                "arrStationZh"
+                              )
+                            }
+                            className="p-1 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+                            title="Sao chép chữ Hán"
+                          >
+                            {copiedKey === "arrStationZh" ? (
+                              <Check className="w-3 h-3 text-emerald-500" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Quick copy both */}
+                      <div className="pt-0.5 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            copyToClipboard(
+                              `${parsed.metro!.arrivalStationPinyin || ''} ${parsed.metro!.arrivalStationZh}`.trim(),
+                              "arrStationBoth"
+                            )
+                          }
+                          className="text-[10px] font-medium text-red-600 hover:text-red-700 dark:text-red-400 flex items-center gap-1 bg-red-50 dark:bg-red-900/40 hover:bg-red-100 dark:hover:bg-red-900/60 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
+                        >
+                          {copiedKey === "arrStationBoth" ? (
+                            <>
+                              <Check className="w-2.5 h-2.5 text-emerald-500" />
+                              <span>Đã copy Pinyin + Hán</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-2.5 h-2.5" />
+                              <span>Copy Pinyin + Chữ Hán</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -407,7 +609,7 @@ export const TransportGuide: React.FC<TransportGuideProps> = ({
                   type="button"
                   onClick={handleOpenMetroMan}
                   className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer"
-                  title="Mở ứng dụng MetroMan (Đã tự động sao chép tên ga chữ Hán)"
+                  title="Mở ứng dụng MetroMan (Đã tự động sao chép Pinyin + Hán)"
                 >
                   <Smartphone className="w-3.5 h-3.5" />
                   <span>Mở app MetroMan</span>
@@ -435,14 +637,15 @@ export const TransportGuide: React.FC<TransportGuideProps> = ({
                   type="button"
                   onClick={() =>
                     copyToClipboard(
-                      `${parsed.metro!.arrivalStationZh}`,
+                      `${parsed.metro!.arrivalStationPinyin || ''} ${parsed.metro!.arrivalStationZh}`.trim(),
                       "copyStationForMetro"
                     )
                   }
                   className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700/60 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                  title="Copy nhanh cả Pinyin và Chữ Hán ga đến"
                 >
                   <Copy className="w-3.5 h-3.5 text-blue-500" />
-                  <span>Copy ga: {parsed.metro.arrivalStationZh}</span>
+                  <span>Copy ga đến (Pinyin + Hán)</span>
                 </button>
               </div>
             </div>
@@ -550,17 +753,49 @@ export const TransportGuide: React.FC<TransportGuideProps> = ({
                   </span>
                 </div>
 
-                <span className="text-[11px] text-purple-600 dark:text-purple-400 font-medium">
-                  Hệ thống đường sắt Trung Quốc (铁路12306)
-                </span>
+                <div className="flex items-center gap-2">
+                  {onEditTransport && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditTransport();
+                      }}
+                      className="text-[11px] text-purple-800 dark:text-purple-300 font-bold flex items-center gap-1.5 bg-purple-100 hover:bg-purple-200 dark:bg-purple-950/60 dark:hover:bg-purple-900/80 px-2.5 py-1 rounded-lg transition-colors cursor-pointer border border-purple-300 dark:border-purple-700/60"
+                      title="Sửa chuyến tàu và ga đi / ga đến"
+                    >
+                      <Edit2 className="w-3 h-3 text-purple-600 dark:text-purple-400" />
+                      <span>Sửa ga tàu</span>
+                    </button>
+                  )}
+                  <span className="text-[11px] text-purple-600 dark:text-purple-400 font-medium hidden sm:inline">
+                    Hệ thống đường sắt Trung Quốc (铁路12306)
+                  </span>
+                </div>
               </div>
 
               {/* Departure & Arrival station cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 bg-purple-50/50 dark:bg-purple-950/20 p-3 rounded-xl border border-purple-100/80 dark:border-purple-900/20">
                 <div className="space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
-                    Ga khởi hành (Ga đi)
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
+                      Ga khởi hành (Ga đi)
+                    </span>
+                    {onEditTransport && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditTransport();
+                        }}
+                        className="text-[10px] text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 transition-colors cursor-pointer"
+                        title="Sửa tên ga đi này"
+                      >
+                        <Edit2 className="w-2.5 h-2.5" />
+                        <span>Sửa ga</span>
+                      </button>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1.5">
                     <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                     <span className="font-semibold text-xs text-slate-800 dark:text-slate-200">
@@ -587,9 +822,25 @@ export const TransportGuide: React.FC<TransportGuideProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
-                    Ga đến (Điểm đến)
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
+                      Ga đến (Điểm đến)
+                    </span>
+                    {onEditTransport && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditTransport();
+                        }}
+                        className="text-[10px] text-red-600 hover:text-red-700 dark:text-red-400 font-semibold flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-50 hover:bg-red-100 dark:bg-red-950/60 transition-colors cursor-pointer"
+                        title="Sửa tên ga đến này"
+                      >
+                        <Edit2 className="w-2.5 h-2.5" />
+                        <span>Sửa ga</span>
+                      </button>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1.5">
                     <div className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
                     <span className="font-semibold text-xs text-slate-800 dark:text-slate-200">
@@ -712,6 +963,12 @@ export const TransportGuide: React.FC<TransportGuideProps> = ({
           </div>
         </div>
       )}
+
+      {/* Diagnostic Utility Modal */}
+      <AppDiagnosticModal
+        isOpen={showDiagnosticModal}
+        onClose={() => setShowDiagnosticModal(false)}
+      />
     </div>
   );
 };

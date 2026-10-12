@@ -57,7 +57,7 @@ export interface TransportDetail {
 export interface CustomExpenseItem {
   id: string;
   title: string;
-  category: "flight" | "visa" | "esim" | "insurance" | "shopping" | "hotel" | "ticket" | "other";
+  category: "flight" | "visa" | "esim" | "insurance" | "shopping" | "hotel" | "ticket" | "food" | "transport" | "other";
   cost_rmb?: number;
   cost_vnd?: number;
   date?: string;
@@ -81,7 +81,7 @@ export interface ActivityEvent {
   // Budget tracking fields
   cost_rmb?: number;
   cost_vnd?: number;
-  cost_category?: "ticket" | "food" | "transport" | "shopping" | "other";
+  cost_category?: "ticket" | "food" | "transport" | "shopping" | "hotel" | "other";
   cost_note?: string;
 }
 
@@ -125,5 +125,6 @@ export interface TripDocument {
   budget_cap_rmb?: number;
   total_budget_cap_rmb?: number;
   total_budget_cap_vnd?: number;
+  category_budget_caps?: Record<string, number>; // e.g. { food: 2500, transport: 2000, hotel: 3500 }
   custom_expenses?: CustomExpenseItem[];
 }

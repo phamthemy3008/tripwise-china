@@ -26,6 +26,8 @@ interface TimelineCardProps {
   hotel?: HotelInfo;
   previousEvent?: ActivityEvent;
   onOpenCostEdit?: () => void;
+  onEditActivity?: () => void;
+  onEditStations?: () => void;
 }
 
 export const TimelineCard: React.FC<TimelineCardProps> = ({
@@ -35,6 +37,8 @@ export const TimelineCard: React.FC<TimelineCardProps> = ({
   hotel,
   previousEvent,
   onOpenCostEdit,
+  onEditActivity,
+  onEditStations,
 }) => {
   const [isCheckedIn, setIsCheckedIn] = useState<boolean>(false);
 
@@ -126,6 +130,19 @@ export const TimelineCard: React.FC<TimelineCardProps> = ({
               <Edit2 className="w-2.5 h-2.5 text-amber-500 opacity-60 ml-0.5" />
             </button>
 
+            {/* Direct Edit Activity Button */}
+            {onEditActivity && (
+              <button
+                type="button"
+                onClick={onEditActivity}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-amber-500 dark:hover:text-amber-400 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer"
+                title="Chỉnh sửa chi tiết hoạt động này (Tên, Giờ, Chữ Hán, Di chuyển, Vé, Mẹo)"
+              >
+                <Edit2 className="w-3 h-3 text-slate-500 dark:text-slate-400" />
+                <span>Sửa</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => setIsCheckedIn(!isCheckedIn)}
@@ -178,12 +195,13 @@ export const TimelineCard: React.FC<TimelineCardProps> = ({
         </div>
 
         {/* Transport Guide (Metro/MetroMan, Taxi/DiDi/Alipay, Gaotie 12306) */}
-        {event.transport_hint && (
+        {(event.transport_hint || event.transport_detail) && (
           <TransportGuide
             event={event}
             hotel={hotel}
             cityName={cityName}
             previousEvent={previousEvent}
+            onEditTransport={onEditStations}
           />
         )}
 
