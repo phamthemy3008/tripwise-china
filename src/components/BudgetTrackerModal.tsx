@@ -389,7 +389,7 @@ export const BudgetTrackerModal: React.FC<BudgetTrackerModalProps> = ({
                 : "text-slate-400 hover:text-white hover:bg-slate-800/60"
             }`}
           >
-            <BarChart3 className="w-3.5 h-3.5 text-blue-400" /> Biểu Đồ &amp; Phân Tích
+            <BarChart3 className="w-3.5 h-3.5 text-blue-400" /> Biểu Đồ & Phân Tích
           </button>
 
           <button
@@ -485,7 +485,7 @@ export const BudgetTrackerModal: React.FC<BudgetTrackerModalProps> = ({
                       <BarChart3 className="w-5 h-5" />
                     </div>
                     <div>
-                      <p className="font-extrabold text-white text-sm">Biểu Đồ &amp; Cảnh Báo Bội Chi Recharts</p>
+                      <p className="font-extrabold text-white text-sm">Biểu Đồ & Cảnh Báo Bội Chi Recharts</p>
                       <p className="text-slate-400 text-xs mt-0.5">
                         Xem cơ cấu phân bổ Donut, tiến độ chi tiêu theo ngày và hạn mức từng nhóm chi phí.
                       </p>

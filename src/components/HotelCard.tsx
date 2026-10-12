@@ -9,9 +9,15 @@ interface HotelCardProps {
   hotel: HotelInfo;
   onOpenCostEdit?: () => void;
   onEditHotel?: () => void;
+  isPublicView?: boolean;
 }
 
-export const HotelCard: React.FC<HotelCardProps> = ({ hotel, onOpenCostEdit, onEditHotel }) => {
+export const HotelCard: React.FC<HotelCardProps> = ({
+  hotel,
+  onOpenCostEdit,
+  onEditHotel,
+  isPublicView = false,
+}) => {
   return (
     <div className="bg-gradient-to-br from-indigo-900/90 to-slate-900 text-white rounded-2xl p-4 sm:p-5 shadow-lg border border-indigo-700/40 my-4">
       <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
@@ -30,7 +36,7 @@ export const HotelCard: React.FC<HotelCardProps> = ({ hotel, onOpenCostEdit, onE
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {onEditHotel && (
+          {!isPublicView && onEditHotel && (
             <button
               type="button"
               onClick={onEditHotel}
@@ -45,31 +51,62 @@ export const HotelCard: React.FC<HotelCardProps> = ({ hotel, onOpenCostEdit, onE
           {typeof hotel.cost_rmb === "number" && hotel.cost_rmb > 0 ? (
             <button
               type="button"
-              onClick={onOpenCostEdit}
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30 transition-all cursor-pointer"
-              title="Bấm để chỉnh sửa tiền phòng khách sạn"
+              onClick={isPublicView ? undefined : onOpenCostEdit}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 ${
+                isPublicView ? "cursor-default" : "hover:bg-emerald-500/30 cursor-pointer"
+              }`}
             >
               <Calculator className="w-3.5 h-3.5 text-emerald-400" />
               <span>{formatRmb(hotel.cost_rmb)}</span>
-              <Edit2 className="w-3 h-3 text-emerald-300 opacity-70" />
+              {!isPublicView && <Edit2 className="w-3 h-3 text-emerald-300 opacity-70" />}
             </button>
-          ) : (
+          ) : !isPublicView && onOpenCostEdit ? (
             <button
               type="button"
               onClick={onOpenCostEdit}
               className="inline-flex items-center gap-1 text-[11px] font-semibold bg-indigo-500/20 text-indigo-200 hover:bg-indigo-500/30 px-2.5 py-1 rounded-full border border-indigo-500/30 transition-all cursor-pointer"
-              title="Nhập tiền phòng khách sạn"
             >
               <Calculator className="w-3 h-3 text-amber-400" />
               <span>+ Tiền phòng</span>
             </button>
-          )}
+          ) : null}
 
           <span className="inline-flex items-center gap-1 text-[11px] bg-indigo-500/20 text-indigo-200 px-2.5 py-1 rounded-full border border-indigo-500/30">
             <Sparkles className="w-3 h-3 text-amber-400" /> Hotel Check-in
           </span>
         </div>
       </div>
+
+      {/* Booking Code & Room Type Privacy Badge Box */}
+      {(hotel.room_type || hotel.booking_code || isPublicView) && (
+        <div className="bg-slate-950/60 p-2.5 rounded-xl border border-indigo-500/20 mb-3 flex items-center justify-between gap-2 flex-wrap text-xs">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div>
+              <span className="text-[10px] text-slate-400 block">Loại phòng:</span>
+              <span className="font-semibold text-indigo-200">
+                {isPublicView
+                  ? "*** (Đã ẩn loại phòng khi chia sẻ)"
+                  : hotel.room_type || "Chưa cập nhật"}
+              </span>
+            </div>
+
+            <div>
+              <span className="text-[10px] text-slate-400 block">Mã đặt phòng:</span>
+              <span className="font-semibold text-emerald-300 font-mono">
+                {isPublicView
+                  ? "*** (Đã ẩn mã booking)"
+                  : hotel.booking_code || "Chưa cập nhật"}
+              </span>
+            </div>
+          </div>
+
+          {isPublicView && (
+            <span className="text-[10px] text-amber-300 font-medium bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+              🔒 Ẩn thông tin riêng tư
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Chinese Hotel Name */}
       <div className="bg-slate-950/50 p-3 rounded-xl border border-indigo-500/20 mb-3 flex items-center justify-between gap-2 flex-wrap">

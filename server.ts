@@ -647,7 +647,7 @@ app.post("/api/trips", (req: Request, res: Response) => {
   res.json({ success: true, data: preparedTrip });
 });
 
-// API: Share Itinerary publicly (Generate permanent share ID and persist)
+// API: Share Itinerary publicly or generate collaboration key
 app.post("/api/share", (req: Request, res: Response) => {
   try {
     const { trip } = req.body;
@@ -656,11 +656,17 @@ app.post("/api/share", (req: Request, res: Response) => {
       return;
     }
     const shareId = trip.id || `trip_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const collabKey =
+      trip.collab_key ||
+      `collab_${shareId}_${Math.random().toString(36).substring(2, 8)}`;
+
     const sharedTrip = {
       ...trip,
       id: shareId,
-      shared_at: Date.now(),
+      collab_key: collabKey,
+      shared_at: trip.shared_at || Date.now(),
       is_shared: true,
+      co_travelers: trip.co_travelers || [],
     };
 
     // Save to disk store
@@ -677,6 +683,7 @@ app.post("/api/share", (req: Request, res: Response) => {
     res.json({
       success: true,
       shareId,
+      collabKey,
       data: sharedTrip,
     });
   } catch (error: any) {
@@ -685,29 +692,76 @@ app.post("/api/share", (req: Request, res: Response) => {
   }
 });
 
+// API: Save Collaborator Edits directly to shared itinerary in real-time
+app.post("/api/trips/:id/collaborate", (req: Request, res: Response) => {
+  try {
+    const tripId = req.params.id;
+    const { trip, collabKey } = req.body;
+
+    if (!trip || !trip.trip_title || !Array.isArray(trip.days)) {
+      res.status(400).json({ error: "Dữ liệu lịch trình gửi lên không hợp lệ" });
+      return;
+    }
+
+    // Verify existing shared trip or create new
+    const existing = sharedTripsStore[tripId] || serverTrips.find((t) => t.id === tripId);
+    if (existing && existing.collab_key && collabKey && existing.collab_key !== collabKey) {
+      res.status(403).json({ error: "Mã mời đồng hành (Collab Key) không hợp lệ" });
+      return;
+    }
+
+    const updatedTrip = {
+      ...trip,
+      id: tripId,
+      collab_key: existing?.collab_key || collabKey || trip.collab_key || `collab_${tripId}_${Math.random().toString(36).substring(2, 8)}`,
+      updated_at: Date.now(),
+      is_shared: true,
+    };
+
+    persistSharedTrip(tripId, updatedTrip);
+
+    const idx = serverTrips.findIndex((t) => t.id === tripId);
+    if (idx >= 0) {
+      serverTrips[idx] = updatedTrip;
+    } else {
+      serverTrips.unshift(updatedTrip);
+    }
+
+    res.json({
+      success: true,
+      data: updatedTrip,
+      message: "Đã đồng bộ thay đổi trực tiếp lên Lịch Trình Chung!",
+    });
+  } catch (error: any) {
+    console.error("Collaborate Edit Error:", error);
+    res.status(500).json({ error: error.message || "Không thể đồng bộ thay đổi" });
+  }
+});
+
 // API: Get Shared Itinerary by shareId (Accessible publicly without authentication)
 app.get("/api/share/:id", (req: Request, res: Response) => {
   const id = req.params.id;
-  // 1. Check persistent sharedTripsStore
-  if (sharedTripsStore[id]) {
-    res.json({ success: true, data: sharedTripsStore[id] });
+  const providedCollabKey = req.query.collab as string | undefined;
+
+  let loadedTrip = sharedTripsStore[id] || serverTrips.find((t) => t.id === id) || SAMPLE_TRIPS.find((t) => t.id === id);
+
+  if (!loadedTrip) {
+    res.status(404).json({
+      success: false,
+      error: "Không tìm thấy lịch trình được chia sẻ hoặc liên kết không tồn tại.",
+    });
     return;
   }
-  // 2. Check serverTrips
-  const fromServer = serverTrips.find((t) => t.id === id);
-  if (fromServer) {
-    res.json({ success: true, data: fromServer });
-    return;
-  }
-  // 3. Check SAMPLE_TRIPS
-  const fromSample = SAMPLE_TRIPS.find((t) => t.id === id);
-  if (fromSample) {
-    res.json({ success: true, data: fromSample });
-    return;
-  }
-  res.status(404).json({
-    success: false,
-    error: "Không tìm thấy lịch trình được chia sẻ hoặc liên kết không tồn tại.",
+
+  // Check if collaborator key matches
+  const isCollaborator =
+    Boolean(providedCollabKey) &&
+    (providedCollabKey === loadedTrip.collab_key || providedCollabKey === `collab_${id}`);
+
+  res.json({
+    success: true,
+    data: loadedTrip,
+    isCollaborator,
   });
 });
 

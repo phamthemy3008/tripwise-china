@@ -28,6 +28,7 @@ interface TimelineCardProps {
   onOpenCostEdit?: () => void;
   onEditActivity?: () => void;
   onEditStations?: () => void;
+  isPublicView?: boolean;
 }
 
 export const TimelineCard: React.FC<TimelineCardProps> = ({
@@ -39,6 +40,7 @@ export const TimelineCard: React.FC<TimelineCardProps> = ({
   onOpenCostEdit,
   onEditActivity,
   onEditStations,
+  isPublicView = false,
 }) => {
   const [isCheckedIn, setIsCheckedIn] = useState<boolean>(false);
 
@@ -119,24 +121,31 @@ export const TimelineCard: React.FC<TimelineCardProps> = ({
             )}
 
             {/* Cost Badge / Quick Edit Button */}
-            <button
-              type="button"
-              onClick={onOpenCostEdit}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-extrabold bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 transition-all cursor-pointer"
-              title="Bấm để nhập/sửa chi phí hoạt động này"
-            >
-              <Calculator className="w-3 h-3 text-amber-500 shrink-0" />
-              <span>{typeof event.cost_rmb === "number" ? formatRmb(event.cost_rmb) : (event.ticket_hint ? `~${event.ticket_hint}` : "+ Chi phí")}</span>
-              <Edit2 className="w-2.5 h-2.5 text-amber-500 opacity-60 ml-0.5" />
-            </button>
+            {!isPublicView ? (
+              <button
+                type="button"
+                onClick={onOpenCostEdit}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-extrabold bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 transition-all cursor-pointer"
+                title="Bấm để nhập/sửa chi phí hoạt động này"
+              >
+                <Calculator className="w-3 h-3 text-amber-500 shrink-0" />
+                <span>{typeof event.cost_rmb === "number" ? formatRmb(event.cost_rmb) : (event.ticket_hint ? `~${event.ticket_hint}` : "+ Chi phí")}</span>
+                <Edit2 className="w-2.5 h-2.5 text-amber-500 opacity-60 ml-0.5" />
+              </button>
+            ) : typeof event.cost_rmb === "number" ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-extrabold bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/30">
+                <Calculator className="w-3 h-3 text-amber-500 shrink-0" />
+                <span>{formatRmb(event.cost_rmb)}</span>
+              </span>
+            ) : null}
 
             {/* Direct Edit Activity Button */}
-            {onEditActivity && (
+            {!isPublicView && onEditActivity && (
               <button
                 type="button"
                 onClick={onEditActivity}
                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-amber-500 dark:hover:text-amber-400 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer"
-                title="Chỉnh sửa chi tiết hoạt động này (Tên, Giờ, Chữ Hán, Di chuyển, Vé, Mẹo)"
+                title="Chỉnh sửa chi tiết hoạt động này"
               >
                 <Edit2 className="w-3 h-3 text-slate-500 dark:text-slate-400" />
                 <span>Sửa</span>
@@ -208,6 +217,35 @@ export const TimelineCard: React.FC<TimelineCardProps> = ({
         {/* Ticket & Booking Guide (WeChat Mini-App, Trip.com) */}
         {event.ticket_hint && (
           <TicketGuide event={event} cityName={cityName} />
+        )}
+
+        {/* Booking Code & Passenger Privacy Box */}
+        {(event.booking_code || event.ticket_code || event.passenger_names) && (
+          <div className="bg-slate-100 dark:bg-slate-800/80 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700/60 flex items-center justify-between gap-2 flex-wrap text-xs">
+            <div className="flex items-center gap-3 flex-wrap">
+              {(event.booking_code || event.ticket_code) && (
+                <div>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Mã đặt vé / Booking:</span>
+                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                    {isPublicView ? "*** (Đã ẩn mã vé cá nhân)" : event.booking_code || event.ticket_code}
+                  </span>
+                </div>
+              )}
+              {event.passenger_names && (
+                <div>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Tên hành khách:</span>
+                  <span className="font-medium text-slate-700 dark:text-slate-200">
+                    {isPublicView ? "*** (Ẩn tên cá nhân khi chia sẻ)" : event.passenger_names}
+                  </span>
+                </div>
+              )}
+            </div>
+            {isPublicView && (
+              <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                🔒 Ẩn thông tin riêng tư
+              </span>
+            )}
+          </div>
         )}
 
         {/* Detailed Description */}

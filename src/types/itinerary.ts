@@ -78,6 +78,10 @@ export interface ActivityEvent {
   transport_detail?: TransportDetail;
   ticket_hint?: string;
   duration_hint?: string;
+  // Privacy & Booking fields
+  booking_code?: string;
+  ticket_code?: string;
+  passenger_names?: string;
   // Budget tracking fields
   cost_rmb?: number;
   cost_vnd?: number;
@@ -91,6 +95,10 @@ export interface HotelInfo {
   address?: string;
   phone?: string;
   price_hint?: string;
+  // Privacy & Accommodation fields
+  room_type?: string;
+  booking_code?: string;
+  guest_names?: string;
   // Budget tracking fields
   cost_rmb?: number;
   cost_vnd?: number;
@@ -107,6 +115,14 @@ export interface DayPlan {
   day_budget_cap_rmb?: number;
 }
 
+export interface CoTraveler {
+  id: string;
+  name: string;
+  email?: string;
+  role: "owner" | "companion";
+  added_at?: number;
+}
+
 export interface TripDocument {
   id?: string;
   trip_title: string;
@@ -120,6 +136,9 @@ export interface TripDocument {
   last_synced_at?: number;
   shared_at?: number;
   is_shared?: boolean;
+  collab_key?: string;
+  co_travelers?: CoTraveler[];
+  travelers_summary?: string; // e.g. "4 người (Anh Nam, Chị Lan, Đức, Vy)"
   // Budget & Currency tracking
   exchange_rate_rmb_vnd?: number; // e.g. 3500
   budget_cap_rmb?: number;

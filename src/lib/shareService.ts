@@ -7,11 +7,14 @@ const CACHED_SHARED_TRIPS_KEY = "tripwise_cached_shared_trips";
 export interface ShareResult {
   shareId: string;
   shareUrl: string;
+  collabKey: string;
+  collabUrl: string;
 }
 
 export async function shareTrip(trip: TripDocument): Promise<ShareResult> {
   const tripId = trip.id || `trip_${Date.now()}`;
   let shareId = tripId;
+  let collabKey = trip.collab_key || `collab_${shareId}_${Math.random().toString(36).substring(2, 8)}`;
 
   try {
     const res = await fetch("/api/share", {
@@ -22,9 +25,8 @@ export async function shareTrip(trip: TripDocument): Promise<ShareResult> {
 
     if (res.ok) {
       const data = await res.json();
-      if (data.shareId) {
-        shareId = data.shareId;
-      }
+      if (data.shareId) shareId = data.shareId;
+      if (data.collabKey) collabKey = data.collabKey;
     }
   } catch (err) {
     console.warn("Share API call failed, falling back to local ID:", err);
@@ -33,7 +35,7 @@ export async function shareTrip(trip: TripDocument): Promise<ShareResult> {
   // Also cache locally in browser
   try {
     const existingCache = JSON.parse(localStorage.getItem(CACHED_SHARED_TRIPS_KEY) || "{}");
-    existingCache[shareId] = trip;
+    existingCache[shareId] = { ...trip, collab_key: collabKey };
     localStorage.setItem(CACHED_SHARED_TRIPS_KEY, JSON.stringify(existingCache));
   } catch {
     // ignore
@@ -41,25 +43,57 @@ export async function shareTrip(trip: TripDocument): Promise<ShareResult> {
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const shareUrl = `${origin}/?share=${encodeURIComponent(shareId)}`;
+  const collabUrl = `${origin}/?share=${encodeURIComponent(shareId)}&collab=${encodeURIComponent(collabKey)}`;
 
   return {
     shareId,
     shareUrl,
+    collabKey,
+    collabUrl,
   };
 }
 
-export async function fetchSharedTrip(shareId: string): Promise<TripDocument | null> {
-  if (!shareId) return null;
+export async function saveCollaboratorEdit(trip: TripDocument, collabKey: string): Promise<TripDocument | null> {
+  if (!trip || !trip.id) return null;
+
+  try {
+    const res = await fetch(`/api/trips/${encodeURIComponent(trip.id)}/collaborate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ trip, collabKey }),
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && json.data) {
+        return json.data as TripDocument;
+      }
+    }
+  } catch (err) {
+    console.warn("Collaborator edit sync failed:", err);
+  }
+
+  return trip;
+}
+
+export async function fetchSharedTrip(
+  shareId: string,
+  collabKeyParam?: string | null
+): Promise<{ trip: TripDocument | null; isCollaborator: boolean }> {
+  if (!shareId) return { trip: null, isCollaborator: false };
 
   let loadedTrip: TripDocument | null = null;
+  let isCollaborator = false;
 
-  // 1. Try public server API /api/share/:id
+  // 1. Try public server API /api/share/:id?collab=...
   try {
-    const res = await fetch(`/api/share/${encodeURIComponent(shareId)}`);
+    const query = collabKeyParam ? `?collab=${encodeURIComponent(collabKeyParam)}` : "";
+    const res = await fetch(`/api/share/${encodeURIComponent(shareId)}${query}`);
     if (res.ok) {
       const json = await res.json();
       if (json.success && json.data) {
         loadedTrip = json.data as TripDocument;
+        isCollaborator = Boolean(json.isCollaborator);
       }
     }
   } catch (err) {
@@ -78,6 +112,13 @@ export async function fetchSharedTrip(shareId: string): Promise<TripDocument | n
       }
     } catch (err) {
       console.warn("Could not fetch trip from /api/trips:", err);
+    }
+  }
+
+  // Check if collabKey matches locally if not set by server
+  if (loadedTrip && collabKeyParam) {
+    if (loadedTrip.collab_key === collabKeyParam || collabKeyParam === `collab_${shareId}`) {
+      isCollaborator = true;
     }
   }
 
@@ -121,10 +162,13 @@ export async function fetchSharedTrip(shareId: string): Promise<TripDocument | n
   }
 
   if (loadedTrip) {
-    return healStationNamesInTrip(loadedTrip).trip;
+    return {
+      trip: healStationNamesInTrip(loadedTrip).trip,
+      isCollaborator,
+    };
   }
 
-  return null;
+  return { trip: null, isCollaborator: false };
 }
 
 export function generateShareSummaryText(trip: TripDocument, shareUrl?: string): string {

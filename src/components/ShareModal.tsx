@@ -22,12 +22,14 @@ interface ShareModalProps {
   isOpen: boolean;
   onClose: () => void;
   trip: TripDocument;
+  onOpenCoTravelers?: () => void;
 }
 
 export const ShareModal: React.FC<ShareModalProps> = ({
   isOpen,
   onClose,
   trip,
+  onOpenCoTravelers,
 }) => {
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedSummary, setCopiedSummary] = useState(false);
@@ -89,7 +91,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       .then(() => {
         setCopiedLink(true);
         toast.success("Đã sao chép liên kết chia sẻ!", {
-          description: "Gửi link này cho bạn bè, họ có thể xem ngay mà không cần đăng nhập.",
+          description: "Gửi link này cho mọi người. Người nhận CHỈ XEM và được ẩn thông tin mã booking/loại phòng.",
         });
         setTimeout(() => setCopiedLink(false), 3000);
       })
@@ -184,7 +186,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
               <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                 Chia Sẻ Lịch Trình
                 <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                  Không Cần Đăng Nhập
+                  Chỉ Xem (🔒 Ẩn Mã Booking)
                 </span>
               </h2>
               <p className="text-xs text-slate-400 truncate max-w-xs sm:max-w-sm">
@@ -214,7 +216,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
             }`}
           >
             <Globe className="w-3.5 h-3.5" />
-            <span>Liên Kết Chia Sẻ (Link)</span>
+            <span>Liên Kết Xem Công Khai</span>
           </button>
 
           <button
@@ -227,21 +229,39 @@ export const ShareModal: React.FC<ShareModalProps> = ({
             }`}
           >
             <QrCode className="w-3.5 h-3.5" />
-            <span>Mã QR Cho Điện Thoại</span>
+            <span>Mã QR Trang Xem</span>
           </button>
         </div>
 
         {/* Body */}
         <div className="p-5 sm:p-6 overflow-y-auto space-y-5 flex-1">
-          {/* Key Benefit Banner */}
-          <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 flex items-start gap-3">
-            <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-white">Người nhận xem trực tiếp ngay lập tức:</p>
-              <p className="text-amber-200/80 mt-0.5 leading-relaxed">
-                Người mở link không cần đăng ký tài khoản. Họ có thể duyệt lịch trình từng ngày, xem bản đồ Amap, tra cứu tiếng Trung phiên âm và thời tiết tự do.
-              </p>
+          {/* Key Benefit Banner with Privacy Guarantee */}
+          <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 space-y-1.5">
+            <div className="flex items-center gap-2 font-bold text-white">
+              <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Chế độ Xem Công Khai được Bảo Mật Riêng Tư:</span>
             </div>
+            <p className="text-amber-200/90 leading-relaxed text-[11px]">
+              • Người nhận link <strong>chỉ có thể xem</strong> (không được sửa trực tiếp).<br />
+              • Tự động <strong>ẩn mã booking, loại phòng, tên khách đi tour</strong> để bảo vệ thông tin cá nhân.<br />
+              • Người xem có nút <strong>"Sao Chép Về Tài Khoản"</strong> để nhân bản nếu muốn sửa riêng.
+            </p>
+
+            {onOpenCoTravelers && (
+              <div className="pt-2 border-t border-amber-500/20">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenCoTravelers();
+                  }}
+                  className="w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Muốn cho người đi cùng SỬA CHUNG? 👉 Mời Người Đi Cùng</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {activeTab === "link" ? (

@@ -20,7 +20,8 @@ import { ChinaSurvivalGuide } from "./components/ChinaSurvivalGuide";
 import { SuggestActivitiesModal } from "./components/SuggestActivitiesModal";
 import { WeatherWidget } from "./components/WeatherWidget";
 import { ShareModal } from "./components/ShareModal";
-import { fetchSharedTrip } from "./lib/shareService";
+import { CoTravelersModal } from "./components/CoTravelersModal";
+import { fetchSharedTrip, saveCollaboratorEdit } from "./lib/shareService";
 import { BudgetTrackerModal } from "./components/BudgetTrackerModal";
 import { CostEditModal } from "./components/CostEditModal";
 import { ActivityEditModal } from "./components/ActivityEditModal";
@@ -62,6 +63,8 @@ import {
   Wallet,
   Calculator,
   Edit2,
+  Users,
+  UserPlus,
 } from "lucide-react";
 
 function MainApp() {
@@ -95,8 +98,9 @@ function MainApp() {
   const [isSyncingGoogleDoc, setIsSyncingGoogleDoc] = useState<boolean>(false);
   const [isSuggestModalOpen, setIsSuggestModalOpen] = useState<boolean>(false);
 
-  // Sharing states
+  // Sharing & Collaboration states
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
+  const [isCoTravelersModalOpen, setIsCoTravelersModalOpen] = useState<boolean>(false);
   const [tripToShare, setTripToShare] = useState<TripDocument | null>(null);
 
   // Budget tracking state
@@ -139,7 +143,7 @@ function MainApp() {
     eventIndex: number;
   } | null>(null);
 
-  // Shared trip guest viewing states
+  // Shared trip & Collaborator viewing states
   const [sharedTrip, setSharedTrip] = useState<TripDocument | null>(null);
   const [isLoadingSharedTrip, setIsLoadingSharedTrip] = useState<boolean>(false);
   const [sharedTripError, setSharedTripError] = useState<string | null>(null);
@@ -150,12 +154,26 @@ function MainApp() {
     }
     return null;
   });
-  const isGuestMode = Boolean(shareParam);
 
-  // Load shared trip if share parameter exists in URL (No login required!)
+  const [collabParam, setCollabParam] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("collab") || null;
+    }
+    return null;
+  });
+
+  const [isCollaborator, setIsCollaborator] = useState<boolean>(false);
+
+  const isGuestMode = Boolean(shareParam);
+  const isPublicViewMode = isGuestMode && !isCollaborator;
+  const isCollaboratorMode = isGuestMode && isCollaborator;
+
+  // Load shared trip or collaborator trip
   useEffect(() => {
     if (!shareParam) {
       setSharedTrip(null);
+      setIsCollaborator(false);
       return;
     }
 
@@ -163,12 +181,13 @@ function MainApp() {
     setIsLoadingSharedTrip(true);
     setSharedTripError(null);
 
-    fetchSharedTrip(shareParam)
+    fetchSharedTrip(shareParam, collabParam)
       .then((data) => {
         if (!isMounted) return;
-        if (data) {
-          setSharedTrip(data);
-          const todayMatch = data.days?.find((d) => checkIsToday(d.date))?.day_number;
+        if (data && data.trip) {
+          setSharedTrip(data.trip);
+          setIsCollaborator(Boolean(data.isCollaborator));
+          const todayMatch = data.trip.days?.find((d) => checkIsToday(d.date))?.day_number;
           setSelectedDayNumber(todayMatch || 1);
         } else {
           setSharedTripError("Không tìm thấy lịch trình được chia sẻ hoặc liên kết đã hết hạn.");
@@ -186,7 +205,7 @@ function MainApp() {
     return () => {
       isMounted = false;
     };
-  }, [shareParam]);
+  }, [shareParam, collabParam]);
 
   // Load user-specific trips whenever user changes
   useEffect(() => {
@@ -392,15 +411,30 @@ function MainApp() {
     };
 
     if (isGuestMode) {
-      setSharedTrip(tripToSave);
-      toast.info("Đã lưu thay đổi vào bản xem hiện tại. Hãy bấm 'Lưu bản sao vào tài khoản' để lưu vĩnh viễn.");
-      return;
+      if (isCollaborator && collabParam) {
+        setSharedTrip(tripToSave);
+        saveCollaboratorEdit(tripToSave, collabParam)
+          .then((synced) => {
+            if (synced) setSharedTrip(synced);
+            toast.success("Đã đồng bộ thay đổi trực tiếp lên Lịch Trình Chung của nhóm!");
+          })
+          .catch(() => {
+            toast.error("Không thể đồng bộ thay đổi trực tiếp.");
+          });
+        return;
+      } else {
+        toast.info("Bạn đang ở Chế độ Chỉ Xem. Hãy bấm 'Sao Chép Về Tài Khoản' để tự do chỉnh sửa!");
+        return;
+      }
     }
 
     if (user) {
       try {
         const updatedList = await saveUserTrip(user.uid, tripToSave);
         setTrips(updatedList);
+        if (tripToSave.collab_key) {
+          saveCollaboratorEdit(tripToSave, tripToSave.collab_key).catch(() => {});
+        }
       } catch (e) {
         console.error("Failed to save trip to Firestore:", e);
         setTrips((prev) => prev.map((t) => (t.id === tripToSave.id ? tripToSave : t)));
@@ -411,6 +445,9 @@ function MainApp() {
         localStorage.setItem("tripwise_anonymous_trips", JSON.stringify(next));
         return next;
       });
+      if (tripToSave.collab_key) {
+        saveCollaboratorEdit(tripToSave, tripToSave.collab_key).catch(() => {});
+      }
     }
   };
 
@@ -665,34 +702,48 @@ function MainApp() {
 
   const handleSaveSharedTripToAccount = async () => {
     if (!currentTrip) return;
-    if (!user) {
-      toast.info("Vui lòng đăng nhập với tài khoản Google để lưu lịch trình vào tài khoản cá nhân!");
-      try {
-        await signInWithGoogle();
-      } catch {
-        // ignore
-      }
-      return;
-    }
 
     try {
+      const newId = `trip_clone_${Date.now()}`;
       const clonedTrip: TripDocument = {
         ...currentTrip,
-        id: `trip_${Date.now()}`,
-        created_at: Date.now(),
+        id: newId,
         trip_title: currentTrip.trip_title.includes("(Bản sao)")
           ? currentTrip.trip_title
-          : `${currentTrip.trip_title} (Bản sao)`,
+          : `${currentTrip.trip_title} (Bản sao cá nhân)`,
+        created_at: Date.now(),
+        updated_at: Date.now(),
+        is_shared: false,
+        collab_key: `collab_${newId}_${Math.random().toString(36).substring(2, 8)}`,
       };
-      const updated = await saveUserTrip(user.uid, clonedTrip);
-      setTrips(updated);
-      setCurrentTripId(clonedTrip.id || "");
-      toast.success("Đã lưu bản sao lịch trình vào tài khoản cá nhân của bạn!", {
-        description: "Bây giờ bạn có thể chỉnh sửa và quản lý lịch trình này độc lập.",
+
+      if (user) {
+        const updated = await saveUserTrip(user.uid, clonedTrip);
+        setTrips(updated);
+      } else {
+        setTrips((prev) => {
+          const next = [clonedTrip, ...prev];
+          localStorage.setItem("tripwise_anonymous_trips", JSON.stringify(next));
+          return next;
+        });
+      }
+
+      // Clear share and collab url params
+      if (typeof window !== "undefined") {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+
+      setShareParam(null);
+      setCollabParam(null);
+      setIsCollaborator(false);
+      setSharedTrip(null);
+      setCurrentTripId(newId);
+
+      toast.success("Đã sao chép lịch trình về tài khoản của bạn!", {
+        description: "Bây giờ bạn có thể tự do chỉnh sửa, thêm địa điểm và quản lý lịch trình độc lập.",
       });
-      handleExitSharedView();
     } catch (err: any) {
-      toast.error("Không thể lưu: " + err.message);
+      toast.error("Không thể sao chép: " + err.message);
     }
   };
 
@@ -795,13 +846,26 @@ function MainApp() {
               <span className="hidden sm:inline">Cẩm Nang</span>
             </button>
 
+            {/* Invite Co-Travelers Button */}
+            {currentTrip && (
+              <button
+                type="button"
+                onClick={() => setIsCoTravelersModalOpen(true)}
+                className="flex items-center gap-1.5 py-1.5 px-2.5 sm:px-3 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 hover:text-white text-xs font-bold border border-indigo-500/40 transition-colors cursor-pointer"
+                title="Mời người đi cùng được quyền xem & sửa trực tiếp lên lịch trình chung"
+              >
+                <Users className="w-3.5 h-3.5 text-indigo-400" />
+                <span className="hidden sm:inline">Mời Đi Cùng</span>
+              </button>
+            )}
+
             {/* Quick Share button in Header */}
             {currentTrip && (
               <button
                 type="button"
                 onClick={() => handleOpenShare(currentTrip)}
                 className="flex items-center gap-1.5 py-1.5 px-2.5 sm:px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors cursor-pointer"
-                title="Tạo liên kết chia sẻ cho người khác xem không cần đăng nhập"
+                title="Tạo liên kết chia sẻ cho người khác xem công khai (Chỉ xem)"
               >
                 <Share2 className="w-3.5 h-3.5 text-amber-400" />
                 <span className="hidden sm:inline">Chia Sẻ</span>
@@ -879,66 +943,73 @@ function MainApp() {
           </div>
         </header>
 
-      {/* Guest Mode Banner (No login required view notification) */}
+      {/* Guest / Collaborator Banners */}
       {isGuestMode && currentTrip && (
-        <div className="bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 px-3 sm:px-4 py-2 text-xs shadow-md no-print border-b border-amber-400/40">
-          <div className="max-w-4xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span className="p-1 rounded-lg bg-slate-950 text-amber-400 shrink-0">
-                <Eye className="w-3.5 h-3.5" />
-              </span>
-              <div className="leading-tight">
-                <span className="font-extrabold">Đang xem lịch trình chia sẻ:</span>{" "}
-                <span className="font-semibold underline underline-offset-2">{currentTrip.trip_title}</span>
-                <span className="hidden md:inline ml-2 text-slate-900/80 font-medium text-[11px]">
-                  &bull; Xem đầy đủ không cần đăng nhập
+        isCollaboratorMode ? (
+          /* Collaborator Mode Banner (Full Edit Access) */
+          <div className="bg-gradient-to-r from-indigo-900 via-purple-900 to-indigo-900 text-white px-3 sm:px-4 py-2 text-xs shadow-md no-print border-b border-indigo-500/40">
+            <div className="max-w-4xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="p-1 rounded-lg bg-indigo-500/20 text-indigo-300 shrink-0 border border-indigo-500/30">
+                  <Users className="w-3.5 h-3.5 text-amber-400" />
+                </span>
+                <div className="leading-tight">
+                  <span className="font-extrabold text-amber-300">🤝 Chế độ Đồng Hành:</span>{" "}
+                  <span className="font-semibold text-white underline underline-offset-2">{currentTrip.trip_title}</span>
+                  <span className="hidden md:inline ml-2 text-indigo-200/90 font-medium text-[11px]">
+                    &bull; Bạn được quyền Xem & Sửa trực tiếp lên Lịch Trình Chung
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                <span className="px-2.5 py-1 rounded-lg bg-indigo-500/30 text-indigo-200 border border-indigo-400/40 font-bold text-[11px] flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-amber-400" /> Đồng bộ trực tiếp
                 </span>
               </div>
             </div>
+          </div>
+        ) : (
+          /* Public Read-Only Banner */
+          <div className="bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 px-3 sm:px-4 py-2 text-xs shadow-md no-print border-b border-amber-400/40">
+            <div className="max-w-4xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="p-1 rounded-lg bg-slate-950 text-amber-400 shrink-0">
+                  <Eye className="w-3.5 h-3.5" />
+                </span>
+                <div className="leading-tight">
+                  <span className="font-extrabold">Chế độ Xem Công Khai (Chỉ Xem):</span>{" "}
+                  <span className="font-semibold underline underline-offset-2">{currentTrip.trip_title}</span>
+                  <span className="hidden md:inline ml-2 text-slate-900/90 font-bold text-[11px]">
+                    (🔒 Tự động ẩn mã booking & thông tin cá nhân)
+                  </span>
+                </div>
+              </div>
 
-            <div className="flex items-center gap-2 shrink-0 flex-wrap">
-              {user ? (
+              <div className="flex items-center gap-2 shrink-0 flex-wrap">
                 <button
                   type="button"
                   onClick={handleSaveSharedTripToAccount}
-                  className="py-1 px-3 rounded-lg bg-slate-950 hover:bg-slate-900 text-amber-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                  className="py-1 px-3 rounded-lg bg-slate-950 hover:bg-slate-900 text-amber-300 font-extrabold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                  title="Nhân bản chuyến đi này về tài khoản của bạn để tự do chỉnh sửa"
                 >
                   <BookmarkPlus className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Lưu bản sao vào tài khoản</span>
+                  <span>Sao Chép Về Tài Khoản Để Sửa</span>
                 </button>
-              ) : (
+
                 <button
                   type="button"
-                  onClick={handleSaveSharedTripToAccount}
-                  className="py-1 px-3 rounded-lg bg-slate-950 hover:bg-slate-900 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                  onClick={() => handleOpenShare(currentTrip)}
+                  className="py-1 px-2.5 rounded-lg bg-white/20 hover:bg-white/30 text-slate-950 font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer"
+                  title="Lấy link hoặc mã QR để gửi tiếp cho người khác"
                 >
-                  <BookmarkPlus className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Đăng nhập để lưu bản sao</span>
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>Chia sẻ link</span>
                 </button>
-              )}
-
-              <button
-                type="button"
-                onClick={() => handleOpenShare(currentTrip)}
-                className="py-1 px-2.5 rounded-lg bg-white/20 hover:bg-white/30 text-slate-950 font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer"
-                title="Lấy link hoặc mã QR để gửi tiếp cho người khác"
-              >
-                <Share2 className="w-3.5 h-3.5" />
-                <span>Chia sẻ link</span>
-              </button>
-
-              {user && (
-                <button
-                  type="button"
-                  onClick={handleExitSharedView}
-                  className="py-1 px-2 rounded-lg bg-slate-950/20 hover:bg-slate-950/30 text-slate-950 font-semibold text-xs transition-colors cursor-pointer"
-                >
-                  Về lịch trình của tôi
-                </button>
-              )}
+              </div>
             </div>
           </div>
-        </div>
+        )
       )}
 
       {/* Offline Alert Banner if disconnected */}
@@ -1181,6 +1252,7 @@ function MainApp() {
                     {dayPlan.hotel && (
                       <HotelCard
                         hotel={dayPlan.hotel}
+                        isPublicView={isPublicViewMode}
                         onOpenCostEdit={() =>
                           setCostEditTarget({ isOpen: true, dayIndex: dayIdx, isHotel: true })
                         }
@@ -1197,35 +1269,37 @@ function MainApp() {
                           Lịch trình Ngày {dayPlan.day_number} ({dayPlan.events.length} hoạt động)
                         </h3>
 
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setActivityEditTarget({
-                                isOpen: true,
-                                dayIndex: dayIdx,
-                                eventIndex: null,
-                              })
-                            }
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95 no-print"
-                            title="Thêm một hoạt động mới vào ngày này"
-                          >
-                            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                            <span>+ Thêm Hoạt Động</span>
-                          </button>
+                        {!isPublicViewMode && (
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setActivityEditTarget({
+                                  isOpen: true,
+                                  dayIndex: dayIdx,
+                                  eventIndex: null,
+                                })
+                              }
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95 no-print"
+                              title="Thêm một hoạt động mới vào ngày này"
+                            >
+                              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                              <span>+ Thêm Hoạt Động</span>
+                            </button>
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedDayNumber(dayPlan.day_number);
-                              setIsSuggestModalOpen(true);
-                            }}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs font-semibold transition-all cursor-pointer no-print"
-                          >
-                            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                            <span className="hidden sm:inline">AI Gợi Ý</span>
-                          </button>
-                        </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedDayNumber(dayPlan.day_number);
+                                setIsSuggestModalOpen(true);
+                              }}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs font-semibold transition-all cursor-pointer no-print"
+                            >
+                              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                              <span className="hidden sm:inline">AI Gợi Ý</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       <div className="space-y-1">
@@ -1236,6 +1310,7 @@ function MainApp() {
                             index={idx}
                             cityName={dayPlan.city}
                             hotel={dayPlan.hotel}
+                            isPublicView={isPublicViewMode}
                             previousEvent={idx > 0 ? dayPlan.events[idx - 1] : undefined}
                             onOpenCostEdit={() =>
                               setCostEditTarget({ isOpen: true, dayIndex: dayIdx, eventIndex: idx })
@@ -1313,6 +1388,7 @@ function MainApp() {
                   {activeDayPlan.hotel && (
                     <HotelCard
                       hotel={activeDayPlan.hotel}
+                      isPublicView={isPublicViewMode}
                       onOpenCostEdit={() => {
                         const activeIdx = currentTrip.days.findIndex(
                           (d) => d.day_number === activeDayPlan.day_number
@@ -1342,35 +1418,37 @@ function MainApp() {
                         Lịch trình chi tiết trong ngày ({activeDayPlan.events.length} hoạt động)
                       </h3>
 
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const activeIdx = currentTrip.days.findIndex(
-                              (d) => d.day_number === activeDayPlan.day_number
-                            );
-                            setActivityEditTarget({
-                              isOpen: true,
-                              dayIndex: activeIdx >= 0 ? activeIdx : 0,
-                              eventIndex: null,
-                            });
-                          }}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black shadow-xs transition-all cursor-pointer active:scale-95 no-print"
-                          title="Thêm một hoạt động mới vào ngày này"
-                        >
-                          <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                          <span>+ Thêm Hoạt Động</span>
-                        </button>
+                      {!isPublicViewMode && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const activeIdx = currentTrip.days.findIndex(
+                                (d) => d.day_number === activeDayPlan.day_number
+                              );
+                              setActivityEditTarget({
+                                isOpen: true,
+                                dayIndex: activeIdx >= 0 ? activeIdx : 0,
+                                eventIndex: null,
+                              });
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black shadow-xs transition-all cursor-pointer active:scale-95 no-print"
+                            title="Thêm một hoạt động mới vào ngày này"
+                          >
+                            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                            <span>+ Thêm Hoạt Động</span>
+                          </button>
 
-                        <button
-                          type="button"
-                          onClick={() => setIsSuggestModalOpen(true)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs font-semibold transition-all cursor-pointer active:scale-95 no-print"
-                        >
-                          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                          <span>AI Gợi Ý</span>
-                        </button>
-                      </div>
+                          <button
+                            type="button"
+                            onClick={() => setIsSuggestModalOpen(true)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs font-semibold transition-all cursor-pointer active:scale-95 no-print"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                            <span>AI Gợi Ý</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-1">
@@ -1386,6 +1464,7 @@ function MainApp() {
                             index={idx}
                             cityName={activeDayPlan.city}
                             hotel={activeDayPlan.hotel}
+                            isPublicView={isPublicViewMode}
                             previousEvent={idx > 0 ? activeDayPlan.events[idx - 1] : undefined}
                             onOpenCostEdit={() => {
                               setCostEditTarget({
@@ -1677,6 +1756,17 @@ function MainApp() {
           isOpen={isShareModalOpen}
           onClose={() => setIsShareModalOpen(false)}
           trip={tripToShare}
+          onOpenCoTravelers={() => setIsCoTravelersModalOpen(true)}
+        />
+      )}
+
+      {/* Co-Travelers Modal (Mời người đi cùng xem & sửa chung) */}
+      {currentTrip && (
+        <CoTravelersModal
+          isOpen={isCoTravelersModalOpen}
+          onClose={() => setIsCoTravelersModalOpen(false)}
+          trip={currentTrip}
+          onUpdateTrip={handleSaveUpdatedTrip}
         />
       )}
 
