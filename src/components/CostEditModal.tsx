@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { DollarSign, X, Check, Calculator, Tag, FileText } from "lucide-react";
+import { DollarSign, X, Check, Calculator, Tag, FileText, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { DEFAULT_EXCHANGE_RATE, formatVnd } from "../lib/budgetUtils";
 
@@ -13,6 +13,7 @@ interface CostEditModalProps {
   initialCategory?: "flight" | "visa" | "esim" | "insurance" | "shopping" | "hotel" | "ticket" | "other";
   initialNote?: string;
   exchangeRate?: number;
+  onOpenHotelCalculator?: () => void;
   onSave: (costRmb: number | undefined, costVnd: number | undefined, category: string, note?: string) => void;
 }
 
@@ -26,6 +27,7 @@ export const CostEditModal: React.FC<CostEditModalProps> = ({
   initialCategory = "ticket",
   initialNote = "",
   exchangeRate = DEFAULT_EXCHANGE_RATE,
+  onOpenHotelCalculator,
   onSave,
 }) => {
   const [rmbStr, setRmbStr] = useState<string>(initialRmb !== undefined && initialRmb !== null ? String(initialRmb) : "");
@@ -51,7 +53,7 @@ export const CostEditModal: React.FC<CostEditModalProps> = ({
     if (!isNaN(num) && num >= 0) {
       setRmbStr((num / exchangeRate).toFixed(1));
     } else if (val === "") {
-      setRmbStr("");
+      setVndStr("");
     }
   };
 
@@ -165,6 +167,28 @@ export const CostEditModal: React.FC<CostEditModalProps> = ({
             </select>
           </div>
 
+          {/* Multi-Night Hotel Split Calculator Helper CTA */}
+          {(category === "hotel" || initialCategory === "hotel") && onOpenHotelCalculator && (
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                <span className="text-amber-200 font-medium">
+                  Khách sạn ở nhiều đêm & chung người?
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenHotelCalculator();
+                }}
+                className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-[11px] shrink-0 cursor-pointer shadow-xs"
+              >
+                🧮 Máy tính chia tiền
+              </button>
+            </div>
+          )}
+
           {/* Note */}
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
@@ -184,13 +208,13 @@ export const CostEditModal: React.FC<CostEditModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
             >
               Hủy
             </button>
             <button
               type="submit"
-              className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md transition-all active:scale-95"
+              className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md transition-all active:scale-95 cursor-pointer"
             >
               <Check className="w-4 h-4" />
               <span>Lưu Chi Phí</span>

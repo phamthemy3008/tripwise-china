@@ -9,6 +9,7 @@ interface HotelCardProps {
   hotel: HotelInfo;
   onOpenCostEdit?: () => void;
   onEditHotel?: () => void;
+  onOpenCalculator?: () => void;
   isPublicView?: boolean;
 }
 
@@ -16,6 +17,7 @@ export const HotelCard: React.FC<HotelCardProps> = ({
   hotel,
   onOpenCostEdit,
   onEditHotel,
+  onOpenCalculator,
   isPublicView = false,
 }) => {
   return (
@@ -36,6 +38,18 @@ export const HotelCard: React.FC<HotelCardProps> = ({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {!isPublicView && onOpenCalculator && (
+            <button
+              type="button"
+              onClick={onOpenCalculator}
+              className="inline-flex items-center gap-1 text-[11px] font-bold bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 px-2.5 py-1 rounded-full border border-amber-500/30 transition-all cursor-pointer shadow-xs"
+              title="Máy tính tự động chia tiền nhiều đêm & chia theo số người"
+            >
+              <Calculator className="w-3.5 h-3.5 text-amber-400" />
+              <span>🧮 Chia tiền phòng</span>
+            </button>
+          )}
+
           {!isPublicView && onEditHotel && (
             <button
               type="button"

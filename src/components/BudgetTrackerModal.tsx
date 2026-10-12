@@ -21,6 +21,10 @@ import {
   DollarSign,
   Layers,
   BarChart3,
+  Building2,
+  ChevronDown,
+  ChevronUp,
+  Calculator,
 } from "lucide-react";
 import { toast } from "sonner";
 import { TripDocument, CustomExpenseItem } from "../types/itinerary";
@@ -30,6 +34,9 @@ import {
   formatVnd,
   DEFAULT_EXCHANGE_RATE,
   CATEGORY_LABELS,
+  getHotelCostRmb,
+  getEventCostRmb,
+  inferEventCategory,
 } from "../lib/budgetUtils";
 import { ExpenseAnalyticsDashboard } from "./ExpenseAnalyticsDashboard";
 
@@ -39,6 +46,8 @@ interface BudgetTrackerModalProps {
   trip: TripDocument;
   onUpdateTrip: (updatedTrip: TripDocument) => void;
   onOpenCostEdit: (dayIndex: number, eventIndex?: number, isHotel?: boolean) => void;
+  onOpenHotelCalculator?: () => void;
+  onOpenTransportCalculator?: (type?: "flight" | "train" | "didi" | "metro") => void;
 }
 
 export const BudgetTrackerModal: React.FC<BudgetTrackerModalProps> = ({
@@ -47,6 +56,8 @@ export const BudgetTrackerModal: React.FC<BudgetTrackerModalProps> = ({
   trip,
   onUpdateTrip,
   onOpenCostEdit,
+  onOpenHotelCalculator,
+  onOpenTransportCalculator,
 }) => {
   const [activeTab, setActiveTab] = useState<"overview" | "analytics" | "categories" | "days" | "custom">("overview");
   const [isSettingBudgetCap, setIsSettingBudgetCap] = useState<boolean>(false);
@@ -58,6 +69,9 @@ export const BudgetTrackerModal: React.FC<BudgetTrackerModalProps> = ({
   const [exchangeRateStr, setExchangeRateStr] = useState<string>(
     String(trip.exchange_rate_rmb_vnd || DEFAULT_EXCHANGE_RATE)
   );
+
+  // Expanded day index for detailed daily item list
+  const [expandedDayIndex, setExpandedDayIndex] = useState<number | null>(0);
 
   // New custom expense form state
   const [isAddingCustom, setIsAddingCustom] = useState<boolean>(false);
@@ -198,26 +212,47 @@ export const BudgetTrackerModal: React.FC<BudgetTrackerModalProps> = ({
               <Wallet className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
-              <h2 className="font-extrabold text-base sm:text-lg text-white flex items-center gap-2">
-                Ngân Sách & Chi Phí
-                <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-                  {trip.trip_title}
-                </span>
-              </h2>
+              <h3 className="font-extrabold text-base sm:text-lg text-white leading-tight">
+                Quản Lý Ngân Sách & Chi Phí Chuyến Đi
+              </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                Theo dõi tổng chi phí vé, khách sạn & máy bay thực tế
+                {trip.trip_title} &bull; Tỷ giá 1 RMB = {summary.exchangeRate.toLocaleString("vi-VN")} ₫
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            {onOpenTransportCalculator && (
+              <button
+                type="button"
+                onClick={() => onOpenTransportCalculator()}
+                className="p-2 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                title="Chia tiền vé máy bay, tàu gaotie, DiDi & metro"
+              >
+                <Plane className="w-4 h-4 text-indigo-400" />
+                <span className="hidden sm:inline">Chia Tiền Vé & Xe</span>
+              </button>
+            )}
+
+            {onOpenHotelCalculator && (
+              <button
+                type="button"
+                onClick={onOpenHotelCalculator}
+                className="p-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                title="Máy tính tự động chia tiền phòng nhiều đêm & chia theo số người"
+              >
+                <Calculator className="w-4 h-4 text-amber-400" />
+                <span className="hidden sm:inline">Chia Tiền KS</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={handleCopySummaryText}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer"
-              title="Sao chép tóm tắt chi phí"
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+              title="Sao chép báo cáo chi phí gửi Zalo/Facebook"
             >
-              <Copy className="w-3.5 h-3.5 text-amber-400" />
+              <Copy className="w-4 h-4 text-amber-400" />
               <span className="hidden sm:inline">Sao chép báo cáo</span>
             </button>
 
@@ -231,21 +266,19 @@ export const BudgetTrackerModal: React.FC<BudgetTrackerModalProps> = ({
           </div>
         </div>
 
-        {/* Top Total Executive Banner */}
-        <div className="px-4 sm:px-6 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 shrink-0">
+        {/* Top Key Metrics Banner */}
+        <div className="bg-slate-950/80 p-4 border-b border-slate-800 shrink-0">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* Box 1: Total Spent */}
-            <div className="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700/80 flex flex-col justify-between">
+            <div className="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700/80">
               <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1">
-                <TrendingUp className="w-3.5 h-3.5 text-amber-400" /> TỔNG CHI PHÍ DỰ DỰNG
+                💰 TỔNG CHI PHÍ DỰ DỰNG
               </span>
-              <div className="mt-1">
-                <div className="text-2xl font-black text-amber-400 tracking-tight">
-                  {formatRmb(summary.totalSpentRmb)}
-                </div>
-                <div className="text-xs font-medium text-slate-300 mt-0.5">
-                  ~ {formatVnd(summary.totalSpentVnd)}
-                </div>
+              <div className="text-xl sm:text-2xl font-black text-amber-400 mt-1 leading-none">
+                {formatRmb(summary.totalSpentRmb)}
+              </div>
+              <div className="text-xs font-bold text-slate-300 mt-1">
+                ~ {formatVnd(summary.totalSpentVnd)}
               </div>
             </div>
 
@@ -253,7 +286,7 @@ export const BudgetTrackerModal: React.FC<BudgetTrackerModalProps> = ({
             <div className="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700/80 flex flex-col justify-between">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1">
-                  🎯 HẠN MỨC NGÂN SÁCH
+                  🎯 HẠN MỨC MỤC TIÊU
                 </span>
                 <button
                   type="button"
@@ -268,7 +301,7 @@ export const BudgetTrackerModal: React.FC<BudgetTrackerModalProps> = ({
                 <div className="mt-1.5 flex items-center gap-1">
                   <input
                     type="number"
-                    placeholder="RMB (VD: 5000)"
+                    placeholder="Nhập hạn mức RMB (VD: 10000)"
                     value={budgetCappingRmb}
                     onChange={(e) => setBudgetCappingRmb(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white"
@@ -283,17 +316,17 @@ export const BudgetTrackerModal: React.FC<BudgetTrackerModalProps> = ({
                 </div>
               ) : (
                 <div className="mt-1">
-                  <div className="text-lg font-extrabold text-white">
+                  <div className="text-base font-extrabold text-white">
                     {summary.budgetCapRmb ? formatRmb(summary.budgetCapRmb) : "Chưa thiết lập"}
                   </div>
-                  {summary.remainingRmb !== undefined && (
+                  {summary.budgetCapRmb && (
                     <div
-                      className={`text-xs font-bold mt-0.5 ${
+                      className={`text-[11px] font-bold mt-0.5 ${
                         isOverBudget ? "text-rose-400" : "text-emerald-400"
                       }`}
                     >
                       {isOverBudget
-                        ? `Vượt ngân sách ${formatRmb(Math.abs(summary.remainingRmb))}`
+                        ? `Vượt ${formatRmb(Math.abs(summary.remainingRmb || 0))}`
                         : `Còn lại ${formatRmb(summary.remainingRmb)}`}
                     </div>
                   )}
@@ -436,86 +469,119 @@ export const BudgetTrackerModal: React.FC<BudgetTrackerModalProps> = ({
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Activities Subtotal */}
-                <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/60 flex items-center justify-between">
+                <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/60 flex flex-col justify-between">
                   <div>
-                    <span className="text-xs text-slate-400 font-semibold flex items-center gap-1.5">
-                      <Ticket className="w-4 h-4 text-amber-400" /> Vé & Hoạt động
-                    </span>
-                    <div className="text-xl font-extrabold text-white mt-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-400 font-semibold flex items-center gap-1.5">
+                        <Ticket className="w-4 h-4 text-amber-400" /> Vé & Hoạt động
+                      </span>
+                      <span className="text-xs font-bold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
+                        {summary.totalSpentRmb > 0
+                          ? Math.round((summary.activitiesSpentRmb / summary.totalSpentRmb) * 100)
+                          : 0}
+                        %
+                      </span>
+                    </div>
+                    <div className="text-xl font-extrabold text-white mt-2">
                       {formatRmb(summary.activitiesSpentRmb)}
                     </div>
                     <div className="text-xs text-slate-400 mt-0.5">
                       ~ {formatVnd(summary.activitiesSpentRmb * summary.exchangeRate)}
                     </div>
                   </div>
-                  <span className="text-xs font-bold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
-                    {summary.totalSpentRmb > 0
-                      ? Math.round((summary.activitiesSpentRmb / summary.totalSpentRmb) * 100)
-                      : 0}
-                    %
-                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("days")}
+                    className="mt-3 text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <span>Xem & sửa giá vé từng hoạt động</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
                 </div>
 
                 {/* Hotel Subtotal */}
-                <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/60 flex items-center justify-between">
+                <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/60 flex flex-col justify-between">
                   <div>
-                    <span className="text-xs text-slate-400 font-semibold flex items-center gap-1.5">
-                      <Building className="w-4 h-4 text-emerald-400" /> Khách sạn & Lưu trú
-                    </span>
-                    <div className="text-xl font-extrabold text-white mt-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-400 font-semibold flex items-center gap-1.5">
+                        <Building2 className="w-4 h-4 text-emerald-400" /> Khách sạn & Lưu trú
+                      </span>
+                      <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                        {summary.totalSpentRmb > 0
+                          ? Math.round((summary.hotelsSpentRmb / summary.totalSpentRmb) * 100)
+                          : 0}
+                        %
+                      </span>
+                    </div>
+                    <div className="text-xl font-extrabold text-white mt-2">
                       {formatRmb(summary.hotelsSpentRmb)}
                     </div>
                     <div className="text-xs text-slate-400 mt-0.5">
                       ~ {formatVnd(summary.hotelsSpentRmb * summary.exchangeRate)}
                     </div>
                   </div>
-                  <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
-                    {summary.totalSpentRmb > 0
-                      ? Math.round((summary.hotelsSpentRmb / summary.totalSpentRmb) * 100)
-                      : 0}
-                    %
-                  </span>
+
+                  <div className="flex items-center gap-2 mt-3 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("categories")}
+                      className="text-xs font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <span>Xem & sửa tiền phòng</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+
+                    {onOpenHotelCalculator && (
+                      <button
+                        type="button"
+                        onClick={onOpenHotelCalculator}
+                        className="text-xs font-bold text-amber-300 bg-amber-500/20 hover:bg-amber-500/30 px-2 py-0.5 rounded border border-amber-500/30 flex items-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <Calculator className="w-3 h-3 text-amber-400" />
+                        <span>🧮 Chia tiền nhiều đêm</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
-                {/* Visual Analytics CTA banner in overview */}
-                <div className="p-4 rounded-2xl bg-blue-950/40 border border-blue-800/60 text-xs text-blue-200 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-blue-600/20 border border-blue-500/30 text-blue-400 shrink-0">
-                      <BarChart3 className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="font-extrabold text-white text-sm">Biểu Đồ & Cảnh Báo Bội Chi Recharts</p>
-                      <p className="text-slate-400 text-xs mt-0.5">
-                        Xem cơ cấu phân bổ Donut, tiến độ chi tiêu theo ngày và hạn mức từng nhóm chi phí.
-                      </p>
-                    </div>
+              {/* Visual Analytics CTA banner in overview */}
+              <div className="p-4 rounded-2xl bg-blue-950/40 border border-blue-800/60 text-xs text-blue-200 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-blue-600/20 border border-blue-500/30 text-blue-400 shrink-0">
+                    <BarChart3 className="w-5 h-5" />
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("analytics")}
-                    className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shrink-0 transition-all cursor-pointer shadow-sm active:scale-95 flex items-center gap-1.5"
-                  >
-                    <span>Xem Biểu Đồ</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                {/* Quick instructions banner */}
-                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 flex items-start gap-3">
-                  <Sparkles className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-bold text-amber-300">Cách nhập & chỉnh sửa chi phí:</p>
-                    <p className="mt-1 text-slate-300 leading-relaxed">
-                      • Bạn có thể nhấn trực tiếp vào thẻ <strong>"Giá vé"</strong> hoặc{" "}
-                      <strong>"Giá phòng"</strong> ở từng thẻ lịch trình để cập nhật giá RMB thực tế.
-                      <br />• Muốn thêm vé máy bay, SIM 4G/eSIM, Visa hoặc các khoản chi cố định, chọn tab{" "}
-                      <strong>"Khoản Chi Khác"</strong>.
+                    <p className="font-extrabold text-white text-sm">Biểu Đồ & Cảnh Báo Bội Chi Recharts</p>
+                    <p className="text-slate-400 text-xs mt-0.5">
+                      Xem cơ cấu phân bổ Donut, tiến độ chi tiêu theo ngày và hạn mức từng nhóm chi phí.
                     </p>
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("analytics")}
+                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shrink-0 transition-all cursor-pointer shadow-sm active:scale-95 flex items-center gap-1.5"
+                >
+                  <span>Xem Biểu Đồ</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
               </div>
-            )}
+
+              {/* Quick instructions banner */}
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 flex items-start gap-3">
+                <Sparkles className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-amber-300">Cách nhập & chỉnh sửa chi phí khách sạn & vé:</p>
+                  <p className="mt-1 text-slate-300 leading-relaxed">
+                    • Nếu bạn ở khách sạn A nhiều đêm (ví dụ 1200 RMB từ ngày 4-10) và đi 2 người, hãy bấm nút <strong>"🧮 Máy tính chia tiền KS"</strong> ở trên để hệ thống tự động quy đổi & điền vào từng đêm!
+                    <br />• Bạn cũng có thể nhấn tab <strong>"Theo Ngày"</strong> hoặc <strong>"Theo Danh Mục"</strong> để tự chỉnh giá từng đêm.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* TAB 2: VISUAL ANALYTICS DASHBOARD (RECHARTS) */}
           {activeTab === "analytics" && (
@@ -529,7 +595,7 @@ export const BudgetTrackerModal: React.FC<BudgetTrackerModalProps> = ({
 
           {/* TAB 3: CATEGORIES BREAKDOWN */}
           {activeTab === "categories" && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {summary.categoryBreakdowns.length === 0 ? (
                 <div className="text-center py-8 text-slate-400 text-xs">
                   Chưa có thông tin chi phí. Hãy nhập chi phí cho hoạt động hoặc khách sạn.
@@ -538,20 +604,106 @@ export const BudgetTrackerModal: React.FC<BudgetTrackerModalProps> = ({
                 summary.categoryBreakdowns.map((cat) => (
                   <div
                     key={cat.category}
-                    className="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/60 flex items-center justify-between"
+                    className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/60 space-y-3"
                   >
-                    <div className="flex items-center gap-3">
-                      <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${cat.color}`}>
-                        {cat.categoryLabel}
-                      </span>
-                      <span className="text-xs text-slate-400">({cat.count} mục)</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${cat.color}`}>
+                          {cat.categoryLabel}
+                        </span>
+                        <span className="text-xs text-slate-400">({cat.count} mục chi phí)</span>
+                      </div>
+
+                      <div className="text-right">
+                        <div className="text-sm font-extrabold text-white">
+                          {formatRmb(cat.totalRmb)}
+                        </div>
+                        <div className="text-[11px] text-slate-400">~ {formatVnd(cat.totalVnd)}</div>
+                      </div>
                     </div>
 
-                    <div className="text-right">
-                      <div className="text-sm font-extrabold text-white">
-                        {formatRmb(cat.totalRmb)}
-                      </div>
-                      <div className="text-[11px] text-slate-400">~ {formatVnd(cat.totalVnd)}</div>
+                    {/* Detailed list of items in this category */}
+                    <div className="mt-2 space-y-2 pt-2 border-t border-slate-700/50">
+                      {cat.category === "hotel" ? (
+                        // Hotels List
+                        trip.days.map((dayPlan, dayIdx) => {
+                          const hotelCost = getHotelCostRmb(dayPlan.hotel);
+                          return (
+                            <div
+                              key={"hotel_cat_" + dayIdx}
+                              className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between gap-3 text-xs"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wide block">
+                                  Ngày {dayPlan.day_number} &bull; {dayPlan.city}
+                                </span>
+                                <h5 className="font-extrabold text-white truncate">
+                                  {dayPlan.hotel?.name_vn || "Khách sạn lưu trú đêm nay"}
+                                </h5>
+                                {dayPlan.hotel?.cost_note && (
+                                  <span className="text-[10px] text-slate-400 block truncate">
+                                    {dayPlan.hotel.cost_note}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="font-extrabold text-emerald-400 text-xs">
+                                  {formatRmb(hotelCost)}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => onOpenCostEdit(dayIdx, undefined, true)}
+                                  className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs border border-emerald-500/30 transition-colors flex items-center gap-1 cursor-pointer"
+                                  title="Chỉnh sửa tiền phòng khách sạn này"
+                                >
+                                  <Edit2 className="w-3 h-3" />
+                                  <span>Sửa giá phòng</span>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        // Activities / Custom Items in this category
+                        trip.days.map((dayPlan, dayIdx) =>
+                          dayPlan.events
+                            .map((evt, evtIdx) => ({ evt, evtIdx }))
+                            .filter(({ evt }) => inferEventCategory(evt) === cat.category)
+                            .map(({ evt, evtIdx }) => {
+                              const cost = getEventCostRmb(evt);
+                              return (
+                                <div
+                                  key={`evt_cat_${dayIdx}_${evtIdx}`}
+                                  className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between gap-3 text-xs"
+                                >
+                                  <div className="min-w-0 flex-1">
+                                    <span className="text-[10px] font-bold text-amber-400 block">
+                                      Ngày {dayPlan.day_number} ({dayPlan.city})
+                                    </span>
+                                    <h5 className="font-bold text-white truncate">
+                                      {evt.activity_title}
+                                    </h5>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span className="font-extrabold text-amber-400 text-xs">
+                                      {formatRmb(cost)}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => onOpenCostEdit(dayIdx, evtIdx, false)}
+                                      className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs border border-slate-700 transition-colors flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <Edit2 className="w-3 h-3" />
+                                      <span>Sửa</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })
+                        )
+                      )}
                     </div>
                   </div>
                 ))
@@ -559,56 +711,158 @@ export const BudgetTrackerModal: React.FC<BudgetTrackerModalProps> = ({
             </div>
           )}
 
-          {/* TAB 3: DAILY EXPENDITURE */}
+          {/* TAB 4: DAILY EXPENDITURE (ITEMIZED EXPANDABLE DAYS) */}
           {activeTab === "days" && (
             <div className="space-y-3">
-              {summary.daySummaries.map((day, idx) => (
-                <div
-                  key={day.dayNumber}
-                  className="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/60 flex items-center justify-between hover:bg-slate-800 transition-colors"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-extrabold text-xs text-amber-400">
-                        Ngày {day.dayNumber}
-                      </span>
-                      <span className="text-xs font-bold text-white">&bull; {day.cityName}</span>
-                    </div>
+              {trip.days.map((dayPlan, idx) => {
+                const daySummary = summary.daySummaries[idx];
+                const isExpanded = expandedDayIndex === idx;
+                const hotelCost = getHotelCostRmb(dayPlan.hotel);
 
-                    <div className="flex items-center gap-3 text-[11px] text-slate-400 mt-1">
-                      <span>Vé & HĐ: {formatRmb(day.activitiesCostRmb)}</span>
-                      <span>KS: {formatRmb(day.hotelCostRmb)}</span>
-                    </div>
-                  </div>
-
-                  <div className="text-right flex items-center gap-3">
-                    <div>
-                      <div className="text-sm font-extrabold text-amber-300">
-                        {formatRmb(day.totalRmb)}
-                      </div>
-                      <div className="text-[10px] text-slate-400">~ {formatVnd(day.totalVnd)}</div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => onOpenCostEdit(idx, 0, false)}
-                      className="p-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold cursor-pointer"
-                      title="Sửa chi phí ngày này"
+                return (
+                  <div
+                    key={dayPlan.day_number}
+                    className="rounded-2xl bg-slate-800/60 border border-slate-700/60 overflow-hidden transition-all"
+                  >
+                    {/* Day Header Row */}
+                    <div
+                      onClick={() => setExpandedDayIndex(isExpanded ? null : idx)}
+                      className="p-3.5 flex items-center justify-between gap-3 cursor-pointer hover:bg-slate-800/80 transition-colors"
                     >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-xs text-amber-400">
+                            Ngày {dayPlan.day_number}
+                          </span>
+                          <span className="text-xs font-bold text-white">&bull; {dayPlan.city}</span>
+                        </div>
+
+                        <div className="flex items-center gap-3 text-[11px] text-slate-400 mt-1">
+                          <span>Vé & HĐ: {formatRmb(daySummary?.activitiesCostRmb || 0)}</span>
+                          <span>&bull; KS: {formatRmb(hotelCost)}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <div className="text-sm font-extrabold text-amber-300">
+                            {formatRmb(daySummary?.totalRmb || 0)}
+                          </div>
+                          <div className="text-[10px] text-slate-400">
+                            ~ {formatVnd(daySummary?.totalVnd || 0)}
+                          </div>
+                        </div>
+
+                        <div className="p-1 rounded-lg bg-slate-700/80 text-slate-300">
+                          {isExpanded ? (
+                            <ChevronUp className="w-4 h-4" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4" />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Itemized Breakdown List for this day */}
+                    {isExpanded && (
+                      <div className="p-3.5 bg-slate-950/70 border-t border-slate-700/60 space-y-2.5 animate-in fade-in duration-150">
+                        {/* Hotel Item */}
+                        <div className="p-3 rounded-xl bg-slate-900 border border-indigo-500/30 flex items-center justify-between gap-3 text-xs">
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                            <div className="p-2 rounded-lg bg-indigo-500/20 text-indigo-300 shrink-0">
+                              <Building2 className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <span className="text-[10px] font-extrabold text-indigo-400 uppercase block">
+                                Khách Sạn Lưu Trú
+                              </span>
+                              <h5 className="font-bold text-white truncate">
+                                {dayPlan.hotel?.name_vn || "Khách sạn lưu trú đêm nay"}
+                              </h5>
+                              {dayPlan.hotel?.cost_note && (
+                                <p className="text-[10px] text-slate-400 truncate">
+                                  {dayPlan.hotel.cost_note}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2.5 shrink-0">
+                            <div className="text-right">
+                              <span className="font-extrabold text-emerald-400 text-xs block">
+                                {formatRmb(hotelCost)}
+                              </span>
+                              <span className="text-[10px] text-slate-400">
+                                ~ {formatVnd(hotelCost * summary.exchangeRate)}
+                              </span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => onOpenCostEdit(idx, undefined, true)}
+                              className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs transition-colors flex items-center gap-1 cursor-pointer shadow-xs"
+                              title="Sửa giá phòng khách sạn đêm này"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                              <span>Sửa tiền phòng</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Activities List */}
+                        <div className="space-y-2 pt-1">
+                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                            Các Hoạt Động & Vé Tham Quan:
+                          </span>
+
+                          {dayPlan.events.map((evt, evtIdx) => {
+                            const cost = getEventCostRmb(evt);
+                            return (
+                              <div
+                                key={`day_evt_${idx}_${evtIdx}`}
+                                className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-3 text-xs hover:border-slate-700 transition-colors"
+                              >
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                  <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] font-bold text-amber-400 shrink-0">
+                                    {evt.time_slot}
+                                  </span>
+                                  <h5 className="font-semibold text-slate-200 truncate">
+                                    {evt.activity_title}
+                                  </h5>
+                                </div>
+
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="font-extrabold text-amber-400 text-xs">
+                                    {formatRmb(cost)}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => onOpenCostEdit(idx, evtIdx, false)}
+                                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs border border-slate-700 transition-colors flex items-center gap-1 cursor-pointer"
+                                    title="Sửa chi phí hoạt động này"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                    <span>Sửa giá</span>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
-          {/* TAB 4: CUSTOM EXPENSES (FLIGHTS, VISA, ESIM, SHOPPING) */}
+          {/* TAB 5: CUSTOM EXPENSES (FLIGHTS, VISA, ESIM, SHOPPING) */}
           {activeTab === "custom" && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-bold text-slate-300">
-                  Các khoản chi khác (Vé máy bay, Visa, eSIM, An uống)
+                  Các khoản chi khác (Vé máy bay, Visa, eSIM, Ăn uống)
                 </h4>
                 <button
                   type="button"

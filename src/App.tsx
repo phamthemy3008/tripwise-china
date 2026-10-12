@@ -28,6 +28,8 @@ import { ActivityEditModal } from "./components/ActivityEditModal";
 import { DayEditModal } from "./components/DayEditModal";
 import { TripInfoEditModal } from "./components/TripInfoEditModal";
 import { StationEditModal } from "./components/StationEditModal";
+import { HotelCostCalculatorModal } from "./components/HotelCostCalculatorModal";
+import { TransportCostCalculatorModal, TransportType } from "./components/TransportCostCalculatorModal";
 import { DayPlan } from "./types/itinerary";
 import { calculateTripBudgetSummary } from "./lib/budgetUtils";
 import {
@@ -105,6 +107,10 @@ function MainApp() {
 
   // Budget tracking state
   const [isBudgetTrackerOpen, setIsBudgetTrackerOpen] = useState<boolean>(false);
+  const [isHotelCalcOpen, setIsHotelCalcOpen] = useState<boolean>(false);
+  const [hotelCalcStartDay, setHotelCalcStartDay] = useState<number>(1);
+  const [isTransportCalcOpen, setIsTransportCalcOpen] = useState<boolean>(false);
+  const [transportCalcType, setTransportCalcType] = useState<TransportType>("flight");
   const [costEditTarget, setCostEditTarget] = useState<{
     isOpen: boolean;
     dayIndex: number;
@@ -804,7 +810,7 @@ function MainApp() {
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-base sm:text-lg tracking-tight text-white">
-                  TripWise <span className="text-amber-400">China</span>
+                  ViVu <span className="text-amber-400">China</span>
                 </span>
                 {isGuestMode ? (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
@@ -1389,6 +1395,10 @@ function MainApp() {
                     <HotelCard
                       hotel={activeDayPlan.hotel}
                       isPublicView={isPublicViewMode}
+                      onOpenCalculator={() => {
+                        setHotelCalcStartDay(activeDayPlan.day_number);
+                        setIsHotelCalcOpen(true);
+                      }}
                       onOpenCostEdit={() => {
                         const activeIdx = currentTrip.days.findIndex(
                           (d) => d.day_number === activeDayPlan.day_number
@@ -1777,10 +1787,43 @@ function MainApp() {
           onClose={() => setIsBudgetTrackerOpen(false)}
           trip={currentTrip}
           onUpdateTrip={handleUpdateTripBudget}
+          onOpenHotelCalculator={() => {
+            setIsBudgetTrackerOpen(false);
+            setHotelCalcStartDay(1);
+            setIsHotelCalcOpen(true);
+          }}
+          onOpenTransportCalculator={(type) => {
+            setIsBudgetTrackerOpen(false);
+            if (type) setTransportCalcType(type);
+            setIsTransportCalcOpen(true);
+          }}
           onOpenCostEdit={(dayIdx: number, evtIdx?: number, isHotel?: boolean) => {
             setIsBudgetTrackerOpen(false);
             setCostEditTarget({ isOpen: true, dayIndex: dayIdx, eventIndex: evtIdx, isHotel });
           }}
+        />
+      )}
+
+      {/* Hotel Multi-Night & Per Person Cost Calculator Modal */}
+      {currentTrip && (
+        <HotelCostCalculatorModal
+          isOpen={isHotelCalcOpen}
+          onClose={() => setIsHotelCalcOpen(false)}
+          trip={currentTrip}
+          onUpdateTrip={handleSaveUpdatedTrip}
+          initialStartDay={hotelCalcStartDay}
+        />
+      )}
+
+      {/* Transport Split Cost Calculator Modal (Flight, Train, DiDi, Metro) */}
+      {currentTrip && (
+        <TransportCostCalculatorModal
+          isOpen={isTransportCalcOpen}
+          onClose={() => setIsTransportCalcOpen(false)}
+          trip={currentTrip}
+          onUpdateTrip={handleSaveUpdatedTrip}
+          initialType={transportCalcType}
+          initialDayNumber={selectedDayNumber || 1}
         />
       )}
 
@@ -1828,6 +1871,11 @@ function MainApp() {
               : ""
           }
           exchangeRate={currentTrip.exchange_rate_rmb_vnd || 3500}
+          onOpenHotelCalculator={() => {
+            setCostEditTarget({ ...costEditTarget, isOpen: false });
+            setHotelCalcStartDay(currentTrip.days[costEditTarget.dayIndex]?.day_number || 1);
+            setIsHotelCalcOpen(true);
+          }}
           onSave={handleSaveCost}
         />
       )}
