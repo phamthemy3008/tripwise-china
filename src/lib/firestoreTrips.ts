@@ -91,6 +91,22 @@ export function healStationNamesInTrip(trip: TripDocument): { trip: TripDocument
         }
       }
 
+      // 6. If Day 7 evening event lacks Cave Hotpot (洞穴火锅 / 洞亭火锅), backfill it from sample
+      if (day.day_number === 7 && newEvt.time_slot === "Tối") {
+        const hasCaveHotpot = newEvt.dishes?.some(
+          (d) => d.dish_name_zh.includes("洞穴火锅") || d.dish_name_zh.includes("洞亭火锅")
+        );
+        if (!hasCaveHotpot && sampleEvt?.dishes) {
+          const sampleCaveDish = sampleEvt.dishes.find(
+            (d) => d.dish_name_zh.includes("洞穴火锅") || d.dish_name_zh.includes("洞亭火锅")
+          );
+          if (sampleCaveDish) {
+            newEvt.dishes = [sampleCaveDish, ...(newEvt.dishes || [])];
+            evtChanged = true;
+          }
+        }
+      }
+
       if (evtChanged) {
         dayChanged = true;
         changed = true;

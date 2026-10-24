@@ -537,6 +537,22 @@ export const SAMPLE_TRIPS: TripDocument[] = [
             tips: "Góc ngắm Hồng Nhai Động trọn vẹn nhất là đứng từ trên cầu Thiên Môn hoặc bờ đối diện.",
             dishes: [
               {
+                dish_name_vn: "Lẩu Hang Động Trùng Khánh (Động Cực Lẩu - Động Đình Hỏa Oa)",
+                dish_name_zh: "重庆洞穴火锅 (洞亭火锅 / 防空洞老火锅)",
+                google_img_keyword: "重庆防空洞火锅 洞亭火锅",
+                baidu_img_keyword: "重庆洞穴火锅 洞亭火锅",
+                restaurant: {
+                  name_vn: "Lẩu Hang Động Động Đình (Hầm Phòng Không Lưỡng Lộ Khẩu)",
+                  name_zh: "洞亭火锅 (防空洞店)",
+                  address_hint: "Số 149 đường Trung Sơn Tam Lộ, Lưỡng Lộ Khẩu, quận Du Trung, Trùng Khánh (gần ga Metro Lianglukou)",
+                  amap_query: "洞亭火锅 防空洞",
+                  price_range: "~75 - 105 ¥/người",
+                  rating: "4.8★ (Đệ nhất Lẩu Hang Động Trùng Khánh)",
+                  recommended_dish: "Nồi lẩu 9 ô cay tê trong hang đá sa thạch, lòng bò tươi giòn (毛肚), ruột vịt (鲜鸭肠), thịt bò ướp cay",
+                  note: "Nằm trọn trong hầm trú ẩn phòng không thời Thế chiến khoét sâu vào vách núi đá, nhiệt độ tự nhiên mát lạnh 20°C quanh năm, từng xuất hiện trong phim 'Anh Hùng Lẩu'."
+                }
+              },
+              {
                 dish_name_vn: "Lẩu cay mỡ bò Trùng Khánh (Lẩu Bội Tỷ / Chu Sư Huynh)",
                 dish_name_zh: "佩姐老火锅 / 周师兄老火锅",
                 google_img_keyword: "重庆老火锅 九宫格",
