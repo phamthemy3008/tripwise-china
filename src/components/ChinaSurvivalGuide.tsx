@@ -113,6 +113,18 @@ export const ChinaSurvivalGuide: React.FC<ChinaSurvivalGuideProps> = ({
                 <span>Tôi muốn đi đến địa chỉ này:</span>
                 <CopyChip text="师傅，请送我到这个地方" label="师傅送我到..." />
               </div>
+              <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <span>Phố cổ Long Môn Hạo:</span>
+                <CopyChip text="龙门浩老街" label="龙门浩老街 (Lóngménhào)" />
+              </div>
+              <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <span>Công viên Nhân Dân:</span>
+                <CopyChip text="人民公园" label="人民公园 (Rénmín)" />
+              </div>
+              <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <span>Trà nắp ấm (Gaiwan Tea):</span>
+                <CopyChip text="盖碗茶" label="盖碗茶 (Gàiwǎnchá)" />
+              </div>
             </div>
           </div>
         </div>

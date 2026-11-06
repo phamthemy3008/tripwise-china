@@ -124,6 +124,21 @@ export function healStationNamesInTrip(trip: TripDocument): { trip: TripDocument
       }
     }
 
+    // 8. Update Day 9 if still has old Dazu Rock Carvings
+    if (day.day_number === 9 && (day.title?.includes("Đại Túc") || day.city?.includes("Đại Túc") || day.events?.some((e) => e.place_name?.includes("Đại Túc")))) {
+      if (sampleDay) {
+        dayChanged = true;
+        changed = true;
+        return {
+          ...day,
+          city: sampleDay.city,
+          title: sampleDay.title,
+          hotel: sampleDay.hotel || day.hotel,
+          events: sampleDay.events,
+        };
+      }
+    }
+
     if (dayChanged) {
       return { ...day, hotel: updatedHotel, events: healedEvents };
     }

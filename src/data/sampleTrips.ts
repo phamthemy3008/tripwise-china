@@ -667,8 +667,8 @@ export const SAMPLE_TRIPS: TripDocument[] = [
       {
         day_number: 9,
         date: "Chủ Nhật, 22/11/2026",
-        city: "Trùng Khánh & Đại Túc (Dazu - 大足)",
-        title: "Day-trip Di Sản Thế Giới Đại Túc Thạch Khắc (Bảo Đỉnh Sơn & Bắc Sơn)",
+        city: "Trùng Khánh (Chongqing - 重庆)",
+        title: "Dạo Chơi Thong Thả: Công Viên Nhân Dân Trà Đạo – Phố Cổ Long Môn Hạo & Chill Ngắm Sông Dương Tử",
         hotel: {
           name_vn: "SENSE SCENE Sanshi Senyin Hotel (Tam Thời Sâm Ấn - Giải Phóng Bối)",
           name_zh: "三时森印酒店（重庆解放碑步行街洪崖洞店）",
@@ -678,58 +678,93 @@ export const SAMPLE_TRIPS: TripDocument[] = [
         events: [
           {
             time_slot: "Sáng",
-            time_range: "08:00 - 12:00",
-            activity_title: "Chiêm ngưỡng Đại Túc Thạch Khắc – Tượng Phật Nằm 31m",
-            description: "Di chuyển bằng xe buýt du lịch trực tiếp hoặc tàu cao tốc đến huyện Đại Túc. Chiêm ngưỡng Di sản Thế giới Đại Túc Thạch Khắc tại Bảo Đỉnh Sơn: Tượng Phật Thích Ca Nhập Niết Bàn dài 31m và tượng Phật Bà Quan Âm Nghìn Mắt Nghìn Tay mạ vàng tinh xảo.",
-            place_name: "Đại Túc Thạch Khắc (Bảo Đỉnh Sơn)",
-            place_zh: "大足石刻宝顶山景区",
-            amap_query: "大足石刻宝顶山景区",
-            transport_hint: "Xe du lịch trực tiếp đón tại Giải Phóng Bối hoặc tàu Gaotie đến Ga Đại Túc Nam",
+            time_range: "09:00 - 12:00",
+            activity_title: "Thong thả dạo phố & Trải nghiệm Trà nắp ấm địa phương tại Công viên Nhân Dân",
+            description: "Thức dậy thong thả không cần vội vã ra ga tàu. Tản bộ đến Công viên Nhân Dân Trùng Khánh (人民公园) ngay trung tâm quận Du Trung. Ngồi ghế mây dưới tán cây cổ thụ trăm năm, nhâm nhi tách Trà hoa nhài nắp đậy (盖碗茉莉花茶) truyền thống, ngắm nhìn nhịp sống chậm rãi của các cụ già chơi cờ tướng, đánh mạt chược và trò chuyện rôm rả.",
+            place_name: "Công viên Nhân Dân Trùng Khánh",
+            place_zh: "重庆人民公园",
+            amap_query: "重庆市人民公园",
+            transport_hint: "Đi bộ 8-10 phút từ khách sạn SENSE SCENE hoặc ga Metro Tiểu Thập Tự (Xiaoshizi)",
             transport_detail: {
-              mode: "train",
-              train_number: "Tàu cao tốc Gaotie G / D",
-              train_departure_station_vn: "Ga Trùng Khánh Bắc (Chongqing North)",
-              train_departure_station_zh: "重庆北站",
-              train_arrival_station_vn: "Ga Đại Túc Nam (Dazu South)",
-              train_arrival_station_zh: "大足南站",
-              train_duration: "35 phút",
-              summary: "Tàu cao tốc từ ga Trùng Khánh Bắc sang ga Đại Túc Nam (~35 phút) rồi đón xe buýt / taxi lên Bảo Đỉnh Sơn",
+              mode: "walk",
+              summary: "Từ khách sạn SENSE SCENE (Dushi Plaza Giải Phóng Bối) đi bộ xuôi theo đường Tân Hoa / Công Viên Lộ khoảng 600m là vào cổng Công viên Nhân Dân"
             },
-            ticket_hint: "Vé trọn gói Bảo Đỉnh Sơn & Bắc Sơn ~140 RMB",
-            duration_hint: "4 tiếng",
+            duration_hint: "3 tiếng",
+            tips: "Một tách trà nắp ấm (cái oản trà) khoảng 10 - 20 RMB, được châm thêm nước sôi miễn phí thoải mái cả buổi sáng.",
             dishes: [
               {
-                dish_name_vn: "Cá diếc Bưu Đình om tương cay ngọt Đại Túc",
-                dish_name_zh: "大足邮亭鲫鱼",
-                google_img_keyword: "邮亭鲫鱼",
-                baidu_img_keyword: "大足邮亭鲫鱼"
+                dish_name_vn: "Trà hoa nhài nắp đậy cái oản (Gaiwan Tea)",
+                dish_name_zh: "盖碗茉莉花茶",
+                google_img_keyword: "重庆 盖碗茶",
+                baidu_img_keyword: "重庆茶馆 盖碗茶"
+              },
+              {
+                dish_name_vn: "Miến chua cay Trùng Khánh (Hảo Hữu Lai)",
+                dish_name_zh: "好又来酸辣粉",
+                google_img_keyword: "重庆酸辣粉",
+                baidu_img_keyword: "重庆八一路好又来酸辣粉"
+              },
+              {
+                dish_name_vn: "Mì Tiểu Diện cay tê Trùng Khánh (Xiao Mian)",
+                dish_name_zh: "重庆小面",
+                google_img_keyword: "重庆小面",
+                baidu_img_keyword: "地道正宗重庆小面"
               }
             ]
           },
           {
             time_slot: "Chiều",
-            time_range: "13:30 - 16:30",
-            activity_title: "Bảo tàng Thạch khắc & Cụm chạm khắc vách đá Bắc Sơn",
-            description: "Tham quan Bảo tàng Thạch khắc Đại Túc và cụm vách đá Bắc Sơn với hàng nghìn tượng Phật chạm khắc tinh xảo từ thời Đường - Tống.",
-            place_name: "Đại Túc Thạch Khắc (Bắc Sơn)",
-            place_zh: "大足北山石刻",
-            amap_query: "大足北山石刻",
-            duration_hint: "3 tiếng"
+            time_range: "14:00 - 17:30",
+            activity_title: "Thưởng ngoạn Phố Cổ Long Môn Hạo & Quán trà sân vườn ngắm Sông Dương Tử",
+            description: "Sang bờ nam sông Dương Tử khám phá Phố cổ Long Môn Hạo (龙门浩老街). Tản bộ trên các bậc thang đá cổ uốn lượn theo sườn dốc núi, chiêm ngưỡng kiến trúc gạch xám thời cận đại mở cảng giao thương thế kỷ trước. Chọn một quán trà/cà phê sân vườn trên cao hướng thẳng ra sông Dương Tử, vừa nhâm nhi tách trà thơm vừa ngắm cabin cáp treo Trường Giang lướt qua lơ lửng ngay trước tầm mắt.",
+            place_name: "Phố cổ Long Môn Hạo (Longmenhao Old Street)",
+            place_zh: "龙门浩老街",
+            amap_query: "龙门浩老街",
+            transport_hint: "Metro Line 6 đến ga Thượng Tân Nhai (Shangxinjie - 上新街站) Cổng 2 / 2B, đi bộ 200m vào cổng trên của phố cổ; hoặc taxi DiDi qua Cầu Đông Thủy Môn (~12 phút)",
+            transport_detail: {
+              mode: "metro",
+              metro_line: "Line 6 (Tuyến số 6)",
+              departure_station_vn: "Ga Tiểu Thập Tự (Xiaoshizi)",
+              departure_station_zh: "小什字站",
+              arrival_station_vn: "Ga Thượng Tân Nhai (Shangxinjie)",
+              arrival_station_zh: "上新街站",
+              station_count: "1 ga vượt sông Dương Tử (~3 phút)",
+              summary: "Đón Metro Line 6 từ ga Xiaoshizi (ngay gần KS) qua hầm ngầm vượt sông Dương Tử đến ga Shangxinjie (上新街站 Cổng 2), đi bộ xuống dốc vào phố cổ Long Môn Hạo"
+            },
+            duration_hint: "3.5 tiếng",
+            ticket_hint: "Vào cửa tự do, miễn phí vé tham quan",
+            tips: "Nên dạo phố cổ theo hướng từ trên cao đi bộ dần xuống dưới bờ sông để đỡ mỏi chân. Khu vực đài Lãm Nguyệt là điểm chụp ảnh cầu Đông Thủy Môn và sông Dương Tử đẹp nhất.",
+            dishes: [
+              {
+                dish_name_vn: "Trà thơm quán trà view sông Long Môn Hạo",
+                dish_name_zh: "老街江景盖碗茶 / 围炉煮茶",
+                google_img_keyword: "龙门浩老街 围炉煮茶",
+                baidu_img_keyword: "龙门浩老街 江景茶馆"
+              }
+            ]
           },
           {
             time_slot: "Tối",
             time_range: "18:00 - 21:00",
-            activity_title: "Lẩu xiên que Trùng Khánh & Chuẩn bị sang Thành Đô",
-            description: "Quay về trung tâm Trùng Khánh. Thưởng thức lẩu xiên que tại tiệm Cương Quản Xưởng hoặc Lý Xuyến Xuyến. Đóng gói hành lý chuẩn bị sang Tứ Xuyên sáng mai.",
-            place_name: "Lẩu xiên que Giải Phóng Bối",
-            place_zh: "重庆串串香",
-            amap_query: "钢管厂五区小郡肝串串香",
+            activity_title: "Ngắm hoàng hôn sông Dương Tử rực sáng, Lẩu xiên que & Chuẩn bị sang Thành Đô",
+            description: "Đón hoàng hôn buông xuống dòng sông Dương Tử, ngắm nhìn skyline tòa tháp Raffles City và khu Bạch Tượng Cư phía bờ đối diện dần lên đèn rực rỡ sắc màu cyberpunk. Thưởng thức bữa tối ấm cúng với Lẩu xiên que (Xuyến Xuyến Hương - 串串香) hoặc các món xào Tứ Xuyên nhẹ nhàng. Sau đó trở về khách sạn SENSE SCENE thảnh thơi đóng gói hành lý chuẩn bị sáng mai đón tàu cao tốc sang Thành Đô.",
+            place_name: "Phố cổ Long Môn Hạo – Bờ Nam Sông Dương Tử",
+            place_zh: "龙门浩老街",
+            amap_query: "龙门浩老街",
+            transport_hint: "Bắt taxi DiDi hoặc Metro Line 6 từ ga Shangxinjie về lại ga Xiaoshizi / Giải Phóng Bối (~10 phút)",
+            duration_hint: "3 tiếng",
             dishes: [
               {
                 dish_name_vn: "Lẩu xiên que Trùng Khánh (Xuyến Xuyến Hương)",
                 dish_name_zh: "重庆串串香",
                 google_img_keyword: "重庆串串香",
-                baidu_img_keyword: "小郡肝串串香"
+                baidu_img_keyword: "重庆老火锅串串香"
+              },
+              {
+                dish_name_vn: "Thịt bò xào ớt chuông & Đậu phụ Ma Bà thanh nhẹ",
+                dish_name_zh: "小炒牛肉 / 麻婆豆腐",
+                google_img_keyword: "四川小炒牛肉",
+                baidu_img_keyword: "家常小炒牛肉 川菜"
               }
             ]
           }
