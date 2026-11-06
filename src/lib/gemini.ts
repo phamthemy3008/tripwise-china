@@ -978,3 +978,388 @@ Yêu cầu chi tiết:
   ];
 }
 
+export interface SmartMatchDayInfo {
+  day_number: number;
+  date?: string;
+  city: string;
+  title: string;
+  existing_places?: string[];
+}
+
+export interface SmartMatchResult {
+  matched_day_number: number;
+  matched_city: string;
+  confidence_score: number;
+  match_reason: string;
+  alternative_days?: number[];
+  event: {
+    time_slot: "Sáng" | "Chiều" | "Tối" | string;
+    time_range?: string;
+    activity_title: string;
+    description: string;
+    place_name: string;
+    place_zh: string;
+    amap_query: string;
+    transport_hint?: string;
+    ticket_hint?: string;
+    duration_hint?: string;
+    tips?: string;
+    cost_rmb?: number;
+    cost_category?: "ticket" | "food" | "transport" | "shopping" | "hotel" | "other";
+    dishes?: Array<{
+      dish_name_vn: string;
+      dish_name_zh: string;
+      restaurant_name?: string;
+      restaurant_zh?: string;
+      price_range?: string;
+    }>;
+  };
+}
+
+/**
+ * Intelligent Destination Matcher & Auto-Inserter
+ * Analyzes an activity/restaurant/landmark keyword, scans the user's entire trip days,
+ * identifies the best matching day, city, and slot, and generates complete event details.
+ */
+export async function smartMatchActivity(params: {
+  query: string;
+  tripDays: SmartMatchDayInfo[];
+}): Promise<SmartMatchResult> {
+  const query = (params.query || "").trim();
+  const days = params.tripDays || [];
+
+  if (!query || days.length === 0) {
+    throw new Error("Vui lòng nhập tên địa điểm/hoạt động và danh sách các ngày trong chuyến đi.");
+  }
+
+  const prompt = `Bạn là chuyên gia tư vấn lịch trình du lịch thông minh tại Trung Quốc.
+Người dùng muốn bổ sung một địa điểm / nhà hàng / món ăn / trải nghiệm vào lịch trình bằng từ khóa: "${query}".
+
+Dưới đây là tóm tắt toàn bộ các ngày trong lịch trình chuyến đi của họ:
+${JSON.stringify(days, null, 2)}
+
+NHIỆM VỤ CỦA BẠN:
+1. Phân tích từ khóa "${query}":
+   - Xác định đây là địa điểm, quán ăn, trải nghiệm gì? Thuộc thành phố nào ở Trung Quốc?
+   - Ví dụ:
+     * "Lẩu Hang Động" / "Động Cực Lẩu" / "洞穴火锅" / "洞亭火锅" -> Trùng Khánh (Chongqing), hầm trú bom chống chiến tranh nổi tiếng.
+     * "Bá Vương Trà Cơ" / "Chagee" / "霸王茶姬" -> Chuỗi trà sữa thảo mộc nổi tiếng, thích hợp buổi chiều/tối ở Trùng Khánh hoặc Thành Đô.
+     * "Cơ sở Gấu Trúc" / "Panda" -> Thành Đô (Chengdu).
+     * "Kim Đỉnh" / "Nga Mi" -> Nga Mi Sơn (Emei).
+     * "Cáp treo Thiên Môn Sơn" / "Vũ Lăng Nguyên" -> Trương Gia Giới.
+     * "Cầu Hồng Kiều" / "Đà Giang" -> Phượng Hoàng Cổ Trấn.
+     * "Đại Phật" -> Lạc Sơn.
+2. Đối chiếu với lịch trình:
+   - Xác định ngày phù hợp nhất (matched_day_number) và thành phố tương ứng (matched_city).
+   - Giải thích lý do lựa chọn (match_reason) bằng tiếng Việt rõ ràng, thân thiện, nêu rõ tính hợp lý về mặt địa lý và thời gian.
+   - Liệt kê các ngày khác trong chuyến đi có cùng thành phố (alternative_days).
+   - Đánh giá độ tin cậy (confidence_score từ 70 đến 100).
+3. Tạo chi tiết hoạt động (event) hoàn chỉnh:
+   - time_slot: "Sáng" | "Chiều" | "Tối" (phù hợp với loại hoạt động, ví dụ lẩu/chợ đêm chọn "Tối", leo núi/ngắm thú chọn "Sáng").
+   - time_range: ví dụ "18:30 - 20:30".
+   - activity_title: Tiêu đề lôi cuốn (VD: "Thưởng thức Lẩu Hang Động Động Đình trứ danh Trùng Khánh").
+   - description: Mô tả hấp dẫn và không gian trải nghiệm.
+   - place_name: Tên tiếng Việt rõ ràng.
+   - place_zh: Tên chữ Hán chuẩn xác nhất để tìm trên Gaode Amap hoặc chỉ cho tài xế/người bản địa.
+   - amap_query: Từ khóa chính xác định vị trên Gaode Amap (VD: "洞亭火锅(中山三路店)").
+   - transport_hint: Cách đi thuận tiện nhất (Metro tuyến mấy, ga nào, hoặc đi bộ/DiDi từ đâu).
+   - ticket_hint: Giá vé hoặc thông tin đặt trước nếu có.
+   - duration_hint: Ước lượng thời gian tham quan/thưởng thức.
+   - tips: Mẹo thực tế (giờ nên đến, gọi nước lẩu uyên ương, gia vị chấm...).
+   - dishes: Danh sách 2-4 món đặc sắc hoặc món nên gọi.
+   - cost_rmb: Ước tính chi phí trung bình theo RMB cho mỗi người.
+   - cost_category: "food" | "ticket" | "transport" | "shopping" | "other".`;
+
+  const schema = {
+    type: Type.OBJECT,
+    properties: {
+      matched_day_number: { type: Type.INTEGER, description: "Số thứ tự ngày phù hợp nhất (1, 2, 3...)" },
+      matched_city: { type: Type.STRING, description: "Thành phố của địa điểm" },
+      confidence_score: { type: Type.INTEGER, description: "Điểm tin cậy từ 70 đến 100" },
+      match_reason: { type: Type.STRING, description: "Lý do vì sao chọn ngày này trong lịch trình" },
+      alternative_days: {
+        type: Type.ARRAY,
+        items: { type: Type.INTEGER },
+        description: "Các ngày khác trong cùng thành phố",
+      },
+      event: {
+        type: Type.OBJECT,
+        properties: {
+          time_slot: { type: Type.STRING, description: "Sáng | Chiều | Tối" },
+          time_range: { type: Type.STRING },
+          activity_title: { type: Type.STRING },
+          description: { type: Type.STRING },
+          place_name: { type: Type.STRING },
+          place_zh: { type: Type.STRING },
+          amap_query: { type: Type.STRING },
+          transport_hint: { type: Type.STRING },
+          ticket_hint: { type: Type.STRING },
+          duration_hint: { type: Type.STRING },
+          tips: { type: Type.STRING },
+          cost_rmb: { type: Type.NUMBER },
+          cost_category: { type: Type.STRING },
+          dishes: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                dish_name_vn: { type: Type.STRING },
+                dish_name_zh: { type: Type.STRING },
+                restaurant_name: { type: Type.STRING },
+                restaurant_zh: { type: Type.STRING },
+                price_range: { type: Type.STRING },
+              },
+              required: ["dish_name_vn", "dish_name_zh"],
+            },
+          },
+        },
+        required: ["time_slot", "activity_title", "place_name", "place_zh", "amap_query"],
+      },
+    },
+    required: ["matched_day_number", "matched_city", "match_reason", "event"],
+  };
+
+  for (const modelName of CANDIDATE_MODELS) {
+    try {
+      const response = await getAi().models.generateContent({
+        model: modelName,
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: schema,
+        },
+      });
+
+      if (response.text) {
+        const parsed = JSON.parse(response.text);
+        if (parsed.matched_day_number && parsed.event) {
+          return parsed;
+        }
+      }
+    } catch (err: any) {
+      if (err?.message?.includes("UNAUTHENTICATED") || err?.message?.includes("401")) {
+        break;
+      }
+      console.warn(`Smart match error with model ${modelName}:`, err.message);
+    }
+  }
+
+  // --- COMPREHENSIVE INTELLIGENT HEURISTIC FALLBACK ---
+  return heuristicSmartMatch(query, days);
+}
+
+/**
+ * Robust heuristic matching engine when offline or API is busy
+ */
+export function heuristicSmartMatch(
+  query: string,
+  days: SmartMatchDayInfo[]
+): SmartMatchResult {
+  const q = query.toLowerCase();
+
+  // Helper to find days by city keyword
+  const findDaysByCity = (cityKeyword: string) => {
+    return days.filter((d) =>
+      d.city.toLowerCase().includes(cityKeyword.toLowerCase()) ||
+      d.title.toLowerCase().includes(cityKeyword.toLowerCase())
+    );
+  };
+
+  // Case 1: Lẩu Hang Động / Động Cực Lẩu / Động Đình (Chongqing Cave Hotpot)
+  if (
+    q.includes("hang động") ||
+    q.includes("động cực") ||
+    q.includes("động đình") ||
+    q.includes("dongting") ||
+    q.includes("cave hotpot") ||
+    q.includes("hầm trú bom") ||
+    q.includes("洞穴") ||
+    q.includes("洞亭") ||
+    q.includes("防空洞")
+  ) {
+    const cqDays = findDaysByCity("Trùng Khánh").length > 0 ? findDaysByCity("Trùng Khánh") : findDaysByCity("Chongqing");
+    const matchedDay = cqDays.find((d) => d.day_number === 7) || cqDays[0] || days[0];
+    const altDays = cqDays.map((d) => d.day_number).filter((num) => num !== matchedDay.day_number);
+
+    return {
+      matched_day_number: matchedDay.day_number,
+      matched_city: "Trùng Khánh",
+      confidence_score: 98,
+      match_reason: `Lẩu Hang Động (洞亭火锅 / 洞穴火锅) là nét văn hóa ẩm thực hầm trú bom đặc trưng bậc nhất của Trùng Khánh. Vào Ngày ${matchedDay.day_number}, buổi tối bạn ở khu vực trung tâm Giải Phóng Bối / Hồng Nhai Động, thưởng thức lẩu hang động lúc này là cực kỳ thuận tiện và chuẩn bài nhất!`,
+      alternative_days: altDays,
+      event: {
+        time_slot: "Tối",
+        time_range: "18:30 - 20:30",
+        activity_title: "Thưởng thức Lẩu Hang Động Động Đình (Dongting Cave Hotpot)",
+        description: "Trải nghiệm ăn lẩu cay tê nồng nàn bên trong hầm trú bom quân sự nguyên bản thời chiến tranh. Không gian vòm đá độc đáo, mát lạnh tự nhiên quanh năm cùng hương vị lẩu Trùng Khánh 9 ngăn đậm đà.",
+        place_name: "Lẩu Hang Động Động Đình (Dongting Hotpot)",
+        place_zh: "洞亭火锅 (防空洞老火锅)",
+        amap_query: "洞亭火锅(中山三路店)",
+        transport_hint: "Đi bộ hoặc bắt taxi DiDi từ Giải Phóng Bia khoảng 10-15 phút; gần ga Metro Lianglukou (Lưỡng Lộ Khẩu) Lối ra 1.",
+        ticket_hint: "Không mất vé vào cửa; nên đến trước 18:00 để lấy bàn vòm đá đẹp không phải chờ đợi.",
+        duration_hint: "Khoảng 1.5 - 2 tiếng",
+        tips: "Nên gọi nồi Uyên Ương (nửa cay tê tê hoa tiêu, nửa nước hầm cà chua/nấm thanh ngọt) để dễ ăn. Nước chấm pha dầu mè tỏi băm để hạ nhiệt và giảm độ cay của ớt hiểm.",
+        cost_rmb: 95,
+        cost_category: "food",
+        dishes: [
+          {
+            dish_name_vn: "Thịt bò cay ướp ớt hiểm mềm mọng",
+            dish_name_zh: "麻辣牛肉",
+            restaurant_name: "洞亭火锅 (Dongting Cave Hotpot)",
+            restaurant_zh: "洞亭火锅",
+            price_range: "~48 ¥/đĩa",
+          },
+          {
+            dish_name_vn: "Ruột vịt tươi giòn nhúng 9 giây",
+            dish_name_zh: "鲜鸭肠",
+            restaurant_name: "洞亭火锅",
+            restaurant_zh: "洞亭火锅",
+            price_range: "~38 ¥/đĩa",
+          },
+          {
+            dish_name_vn: "Mao Huyết Vượng huyết vịt mềm tan",
+            dish_name_zh: "鲜鸭血",
+            restaurant_name: "洞亭火锅",
+            restaurant_zh: "洞亭火锅",
+            price_range: "~22 ¥/đĩa",
+          },
+          {
+            dish_name_vn: "Mì khoai dẻo & Trà thảo dược Lão Ẩm Tử thanh mát",
+            dish_name_zh: "老鹰茶 & 贡菜",
+            restaurant_name: "洞亭火锅",
+            restaurant_zh: "洞亭火锅",
+            price_range: "~15 ¥/phần",
+          },
+        ],
+      },
+    };
+  }
+
+  // Case 2: Bá Vương Trà Cơ (Chagee Milk Tea)
+  if (
+    q.includes("bá vương") ||
+    q.includes("chagee") ||
+    q.includes("trà cơ") ||
+    q.includes("trà sữa") ||
+    q.includes("霸王茶姬")
+  ) {
+    const matchedDay = days.find((d) => d.day_number === 8 || d.day_number === 7 || d.day_number === 11) || days[0];
+    return {
+      matched_day_number: matchedDay.day_number,
+      matched_city: matchedDay.city || "Trùng Khánh",
+      confidence_score: 95,
+      match_reason: `Bá Vương Trà Cơ (CHAGEE 霸王茶姬) là thương hiệu trà sữa quốc dân nổi tiếng có mặt tại mọi trung tâm thương mại lớn ở ${matchedDay.city}. Rất lý tưởng để thưởng thức sau bữa ăn hoặc khi đi dạo phố!`,
+      alternative_days: days.map((d) => d.day_number).filter((n) => n !== matchedDay.day_number),
+      event: {
+        time_slot: "Chiều",
+        time_range: "16:00 - 17:00",
+        activity_title: "Thưởng thức Trà Sữa Bá Vương Trà Cơ (CHAGEE)",
+        description: "Thưởng thức ly trà sữa đậm vị trà mộc hoa nhài, ô long đào kết hợp sữa tươi thanh nhẹ không béo ngậy trong ly giấy thiết kế phong cách hoàng gia Trung Hoa.",
+        place_name: "Bá Vương Trà Cơ (CHAGEE)",
+        place_zh: "霸王茶姬 (CHAGEE)",
+        amap_query: `霸王茶姬 ${matchedDay.city}`,
+        transport_hint: "Có mặt tại hầu hết các trung tâm thương mại và phố đi bộ lớn.",
+        ticket_hint: "Đặt qua mini app WeChat hoặc Alipay để nhận ngay mã lấy đồ không cần xếp hàng.",
+        duration_hint: "Khoảng 30 phút",
+        tips: "Món bestseller là Bá Nha Tuyệt Huyền (伯牙绝弦 - Trà nhài sữa tươi) mức ngọt 50% hoặc ít đá.",
+        cost_rmb: 20,
+        cost_category: "food",
+        dishes: [
+          {
+            dish_name_vn: "Trà Nhài Sữa Tươi Bá Nha Tuyệt Huyền",
+            dish_name_zh: "伯牙绝弦",
+            restaurant_name: "CHAGEE 霸王茶姬",
+            restaurant_zh: "霸王茶姬",
+            price_range: "~18 - 22 ¥/ly",
+          },
+        ],
+      },
+    };
+  }
+
+  // Case 3: Cơ sở Gấu Trúc Thành Đô (Chengdu Panda Base)
+  if (
+    q.includes("gấu trúc") ||
+    q.includes("panda") ||
+    q.includes("đại hồng miêu") ||
+    q.includes("xiongmao") ||
+    q.includes("熊猫")
+  ) {
+    const cdDays = findDaysByCity("Thành Đô").length > 0 ? findDaysByCity("Thành Đô") : findDaysByCity("Chengdu");
+    const matchedDay = cdDays.find((d) => d.day_number === 10 || d.day_number === 11) || cdDays[0] || days[0];
+
+    return {
+      matched_day_number: matchedDay.day_number,
+      matched_city: "Thành Đô",
+      confidence_score: 99,
+      match_reason: `Cơ sở Nghiên cứu Nhân giống Gấu Trúc khổng lồ nằm tại ngoại ô Thành Đô. Vào Ngày ${matchedDay.day_number}, buổi sáng sớm là thời điểm các bé gấu trúc thức dậy ăn trúc và chơi đùa năng động nhất trong ngày!`,
+      alternative_days: cdDays.map((d) => d.day_number).filter((n) => n !== matchedDay.day_number),
+      event: {
+        time_slot: "Sáng",
+        time_range: "07:30 - 11:30",
+        activity_title: "Tham quan Cơ sở Nhân giống Gấu Trúc Thành Đô",
+        description: "Ngắm nhìn những chú gấu trúc khổng lồ và gấu trúc đỏ đáng yêu ăn măng tre, trèo cây và lăn lộn vui nhộn trong khu rừng sinh thái tự nhiên.",
+        place_name: "Cơ sở Nghiên cứu Nhân giống Gấu trúc Thành Đô",
+        place_zh: "成都大熊猫繁育研究基地",
+        amap_query: "成都大熊猫繁育研究基地",
+        transport_hint: "Đi Metro Tuyến 3 đến Ga Panda Avenue (熊猫大道站), sau đó chuyển sang xe bus trung chuyển danh lam thắng cảnh (Scenic Shuttle Bus).",
+        ticket_hint: "Vé khoảng 55 ¥/người lớn. Bắt buộc đặt trước qua WeChat/Trip.com vì giới hạn lượng khách.",
+        duration_hint: "Khoảng 3 - 4 tiếng",
+        tips: "Nên đến từ 07:30 - 08:00 sáng. Sau 10:30 trời ấm lên gấu thường vào chuồng điều hòa ngủ.",
+        cost_rmb: 55,
+        cost_category: "ticket",
+      },
+    };
+  }
+
+  // Generic heuristic based on city keywords inside query or itinerary days
+  let bestDay = days[0];
+  let bestCity = days[0].city || "Trung Quốc";
+  let maxScore = 50;
+
+  for (const day of days) {
+    let score = 50;
+    const cLow = (day.city || "").toLowerCase();
+    const tLow = (day.title || "").toLowerCase();
+
+    if (q.includes(cLow) || (cLow && q.includes(cLow.substring(0, 4)))) {
+      score += 40;
+    }
+    if (day.existing_places?.some((p) => q.includes(p.toLowerCase()) || p.toLowerCase().includes(q))) {
+      score += 30;
+    }
+    if (tLow.split(" ").some((w) => w.length > 2 && q.includes(w))) {
+      score += 15;
+    }
+
+    if (score > maxScore) {
+      maxScore = score;
+      bestDay = day;
+      bestCity = day.city;
+    }
+  }
+
+  return {
+    matched_day_number: bestDay.day_number,
+    matched_city: bestCity,
+    confidence_score: Math.min(95, maxScore),
+    match_reason: `Dựa trên hành trình của bạn, Ngày ${bestDay.day_number} tại ${bestCity} là thời điểm thuận tiện nhất để kết hợp thêm hoạt động "${query}" vào lịch trình di chuyển!`,
+    alternative_days: days.filter((d) => d.day_number !== bestDay.day_number && d.city === bestCity).map((d) => d.day_number),
+    event: {
+      time_slot: q.includes("tối") || q.includes("lẩu") || q.includes("đêm") ? "Tối" : q.includes("sáng") ? "Sáng" : "Chiều",
+      time_range: q.includes("tối") || q.includes("lẩu") ? "18:30 - 20:30" : "14:30 - 17:00",
+      activity_title: `Khám phá & Trải nghiệm ${query}`,
+      description: `Ghé thăm và trải nghiệm ${query} tại khu vực ${bestCity}. Tận hưởng không khí đặc sắc và lưu lại những bức ảnh kỷ niệm đáng nhớ.`,
+      place_name: query,
+      place_zh: query,
+      amap_query: `${bestCity} ${query}`,
+      transport_hint: `Di chuyển thuận tiện bằng Metro hoặc taxi DiDi từ trung tâm ${bestCity}.`,
+      duration_hint: "Khoảng 1.5 - 2 tiếng",
+      tips: "Nên lưu sẵn tên tiếng Trung trên ứng dụng Gaode Amap để chỉ đường chính xác cho tài xế.",
+      cost_rmb: 60,
+      cost_category: q.includes("lẩu") || q.includes("ăn") ? "food" : "ticket",
+    },
+  };
+}
+
+

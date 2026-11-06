@@ -1097,10 +1097,10 @@ export const SAMPLE_TRIPS: TripDocument[] = [
         city: "Lạc Sơn & Nga Mi Sơn (Leshan & Mount Emei - 峨眉山)",
         title: "Du Thuyền Ngắm Lạc Sơn Đại Phật 71m – Suối Khoáng Nóng Nga Mi Sơn",
         hotel: {
-          name_vn: "Emei Mountain and Courtyard. Jingzhu Shiguang Hot Spring Hotel",
-          name_zh: "峨眉山院子·静竹时光温泉酒店",
-          address: "Số 1, Viện 1, Khu văn hóa Nga Mi Sơn Viện Tử, Nam đoạn đường Danh Sơn, Nga Mi Sơn",
-          phone: "+86-833-5591999"
+          name_vn: "Resort Nghỉ Dưỡng Thiên Cảnh Nga Mi Sơn (Tianjing Resort Hotel)",
+          name_zh: "峨眉山天境度假酒店",
+          address: "Số 158 Tòa 6 Đường Đông Tú Hồ, cạnh bờ hồ Nga Tú (峨秀湖), Nga Mi Sơn, Lạc Sơn",
+          phone: "+86-833-2620222"
         },
         events: [
           {
@@ -1142,12 +1142,12 @@ export const SAMPLE_TRIPS: TripDocument[] = [
           {
             time_slot: "Chiều",
             time_range: "13:30 - 17:30",
-            activity_title: "Sang Ga Nga Mi Sơn, Nhận phòng Suối nước nóng & Viếng Chùa Báo Quốc",
-            description: "Đón tàu cao tốc 15 phút từ Lạc Sơn sang ga Nga Mi Sơn. Nhận phòng resort suối khoáng nóng Jingzhu Shiguang. Tản bộ vãng cảnh Chùa Báo Quốc và Chùa Phục Hổ cổ kính giữa rừng đại ngàn.",
-            place_name: "Chùa Báo Quốc & Nga Mi Sơn Viện Tử",
+            activity_title: "Sang Ga Nga Mi Sơn, Nhận phòng Resort Thiên Cảnh ven Hồ Nga Tú & Viếng Chùa Báo Quốc",
+            description: "Đón tàu cao tốc 15 phút từ Lạc Sơn sang ga Nga Mi Sơn (chỉ cách khách sạn ~2km). Nhận phòng tại Resort Thiên Cảnh Nga Mi Sơn (峨眉山天境度假酒店) view hồ Nga Tú tuyệt đẹp ngắm Kim Đỉnh từ xa. Tản bộ vãng cảnh Chùa Báo Quốc và Chùa Phục Hổ cổ kính giữa rừng đại ngàn.",
+            place_name: "Chùa Báo Quốc & Hồ Nga Tú",
             place_zh: "峨眉山报国寺",
             amap_query: "峨眉山报国寺",
-            transport_hint: "Tàu cao tốc 15 phút từ ga Leshan sang ga Emeishan; Taxi 5 phút về khách sạn",
+            transport_hint: "Tàu cao tốc 15 phút từ ga Leshan sang ga Emeishan; Khách sạn cách ga 2km (có xe đưa đón / taxi 5 phút)",
             transport_detail: {
               mode: "train",
               train_number: "Tàu cao tốc CRH Lạc Sơn - Nga Mi",
@@ -1156,18 +1156,18 @@ export const SAMPLE_TRIPS: TripDocument[] = [
               train_arrival_station_vn: "Ga Núi Nga Mi (Emeishan)",
               train_arrival_station_zh: "峨眉山站",
               train_duration: "15 phút",
-              summary: "Tàu cao tốc 15 phút từ ga Lạc Sơn (乐山站) sang ga Núi Nga Mi (峨眉山站, sát chân núi và Chùa Báo Quốc)",
+              summary: "Tàu cao tốc 15 phút từ ga Lạc Sơn (乐山站) sang ga Núi Nga Mi (峨眉山站, cách khách sạn Thiên Cảnh ~2km)",
             },
             duration_hint: "4 tiếng"
           },
           {
             time_slot: "Tối",
             time_range: "18:00 - 21:00",
-            activity_title: "Ngâm suối khoáng nóng sân vườn & Ẩm thực Nga Mi",
-            description: "Thư giãn ngâm mình trong bể khoáng nóng sân vườn lộ thiên giữa rặng trúc xanh mát. Thưởng thức vịt kho nấm tuyết phơi sương, súp đậu hũ nẫu Nga Mi.",
-            place_name: "Resort Suối khoáng nóng Tĩnh Trúc Thời Quang",
-            place_zh: "峨眉山院子·静竹时光温泉酒店",
-            amap_query: "峨眉山院子·静竹时光温泉酒店",
+            activity_title: "Thư giãn ngâm suối khoáng nóng hồ Nga Tú & Ẩm thực Nga Mi",
+            description: "Thư giãn ngâm mình trong bể khoáng nóng riêng/sân vườn tại Resort Thiên Cảnh giữa không gian yên bình cạnh hồ Nga Tú. Thưởng thức vịt kho nấm tuyết phơi sương, súp đậu hũ nẫu Nga Mi.",
+            place_name: "Resort Nghỉ Dưỡng Thiên Cảnh Nga Mi Sơn",
+            place_zh: "峨眉山天境度假酒店",
+            amap_query: "峨眉山天境度假酒店",
             dishes: [
               {
                 dish_name_vn: "Vịt kho nấm tuyết Konjac phơi sương",

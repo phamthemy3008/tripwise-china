@@ -6,7 +6,7 @@ import multer from "multer";
 import mammoth from "mammoth";
 import fs from "fs";
 import path from "path";
-import { parseTripWithGemini, suggestActivities, suggestRestaurants } from "./src/lib/gemini.js";
+import { parseTripWithGemini, suggestActivities, suggestRestaurants, smartMatchActivity } from "./src/lib/gemini.js";
 import { SAMPLE_TRIPS } from "./src/data/sampleTrips.js";
 
 const app = express();
@@ -620,6 +620,31 @@ app.post("/api/suggest-restaurants", async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Suggest restaurants error:", error);
     res.status(500).json({ error: error.message || "Lỗi khi gợi ý quán ăn" });
+  }
+});
+
+// API: Smart Destination/Activity Matcher across whole itinerary
+app.post("/api/smart-match-activity", async (req: Request, res: Response) => {
+  try {
+    const { query, tripDays } = req.body;
+    if (!query || typeof query !== "string") {
+      res.status(400).json({ error: "Vui lòng nhập tên địa danh hoặc trải nghiệm cần tìm." });
+      return;
+    }
+    if (!Array.isArray(tripDays) || tripDays.length === 0) {
+      res.status(400).json({ error: "Thiếu thông tin các ngày trong chuyến đi." });
+      return;
+    }
+
+    const matchResult = await smartMatchActivity({
+      query: query.trim(),
+      tripDays,
+    });
+
+    res.json({ success: true, data: matchResult });
+  } catch (error: any) {
+    console.error("Smart match activity error:", error);
+    res.status(500).json({ error: error.message || "Lỗi khi phân tích & tìm ngày phù hợp" });
   }
 });
 

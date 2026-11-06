@@ -114,8 +114,18 @@ export function healStationNamesInTrip(trip: TripDocument): { trip: TripDocument
       return newEvt;
     });
 
+    // 7. Update Day 14 hotel if still has old hotel
+    let updatedHotel = day.hotel;
+    if (day.day_number === 14 && (!day.hotel || day.hotel.name_zh?.includes("峨眉山院子") || day.hotel.name_zh?.includes("静竹时光"))) {
+      if (sampleDay?.hotel) {
+        updatedHotel = sampleDay.hotel;
+        dayChanged = true;
+        changed = true;
+      }
+    }
+
     if (dayChanged) {
-      return { ...day, events: healedEvents };
+      return { ...day, hotel: updatedHotel, events: healedEvents };
     }
     return day;
   });

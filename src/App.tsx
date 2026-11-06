@@ -30,6 +30,7 @@ import { TripInfoEditModal } from "./components/TripInfoEditModal";
 import { StationEditModal } from "./components/StationEditModal";
 import { HotelCostCalculatorModal } from "./components/HotelCostCalculatorModal";
 import { TransportCostCalculatorModal, TransportType } from "./components/TransportCostCalculatorModal";
+import { SmartAutoAddModal } from "./components/SmartAutoAddModal";
 import { DayPlan } from "./types/itinerary";
 import { calculateTripBudgetSummary } from "./lib/budgetUtils";
 import {
@@ -67,6 +68,7 @@ import {
   Edit2,
   Users,
   UserPlus,
+  Zap,
 } from "lucide-react";
 
 function MainApp() {
@@ -99,6 +101,7 @@ function MainApp() {
   const [isLoadingTrips, setIsLoadingTrips] = useState<boolean>(false);
   const [isSyncingGoogleDoc, setIsSyncingGoogleDoc] = useState<boolean>(false);
   const [isSuggestModalOpen, setIsSuggestModalOpen] = useState<boolean>(false);
+  const [isSmartAutoAddOpen, setIsSmartAutoAddOpen] = useState<boolean>(false);
 
   // Sharing & Collaboration states
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
@@ -482,6 +485,25 @@ function MainApp() {
     const updatedTrip: TripDocument = {
       ...currentTrip,
       days: updatedDays,
+    };
+    handleSaveUpdatedTrip(updatedTrip);
+  };
+
+  // Smart Auto-Add activity to any matched day without manual coding
+  const handleSmartAutoAddEvent = (dayNumber: number, event: ActivityEvent) => {
+    if (!currentTrip) return;
+    const dayIndex = currentTrip.days.findIndex((d) => d.day_number === dayNumber);
+    if (dayIndex < 0) return;
+
+    const updatedDays = [...currentTrip.days];
+    const targetDay = { ...updatedDays[dayIndex] };
+    targetDay.events = [...targetDay.events, event];
+    updatedDays[dayIndex] = targetDay;
+
+    const updatedTrip: TripDocument = {
+      ...currentTrip,
+      days: updatedDays,
+      updated_at: new Date().toISOString(),
     };
     handleSaveUpdatedTrip(updatedTrip);
   };
@@ -1066,7 +1088,17 @@ function MainApp() {
                 </div>
 
                 {/* Quick actions for current trip */}
-                <div className="flex items-center gap-2 shrink-0 no-print">
+                <div className="flex items-center gap-2 shrink-0 no-print flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setIsSmartAutoAddOpen(true)}
+                    className="p-2 sm:px-3 sm:py-2 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs transition-all shadow-md flex items-center gap-1.5 cursor-pointer active:scale-95"
+                    title="Chỉ cần nhập tên địa điểm/quán ăn (VD: Lẩu Hang Động), hệ thống tự tìm ngày và bổ sung vào lịch trình mà không cần sửa code"
+                  >
+                    <Zap className="w-3.5 h-3.5 fill-current" />
+                    <span className="text-[11px] font-black">⚡ Tự Tìm Ngày & Bổ Sung</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => handleOpenShare(currentTrip)}
@@ -1304,6 +1336,16 @@ function MainApp() {
                               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                               <span className="hidden sm:inline">AI Gợi Ý</span>
                             </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setIsSmartAutoAddOpen(true)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/30 text-xs font-bold transition-all cursor-pointer no-print"
+                              title="Tự tìm ngày thích hợp nhất để thêm địa điểm"
+                            >
+                              <Zap className="w-3 h-3 text-amber-400 fill-current" />
+                              <span className="hidden md:inline">Tự Tìm Ngày</span>
+                            </button>
                           </div>
                         )}
                       </div>
@@ -1456,6 +1498,16 @@ function MainApp() {
                           >
                             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                             <span>AI Gợi Ý</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setIsSmartAutoAddOpen(true)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/30 text-xs font-bold transition-all cursor-pointer active:scale-95 no-print"
+                            title="Tự tìm ngày thích hợp nhất để thêm địa điểm"
+                          >
+                            <Zap className="w-3.5 h-3.5 text-amber-400 fill-current" />
+                            <span className="hidden sm:inline">Tự Tìm Ngày</span>
                           </button>
                         </div>
                       )}
@@ -1970,6 +2022,26 @@ function MainApp() {
             onSaveStations={handleSaveStations}
           />
         )}
+
+      {/* Smart Destination & Activity Auto-Matcher Inserter */}
+      {currentTrip && isSmartAutoAddOpen && (
+        <SmartAutoAddModal
+          isOpen={isSmartAutoAddOpen}
+          onClose={() => setIsSmartAutoAddOpen(false)}
+          days={currentTrip.days}
+          exchangeRate={currentTrip.exchange_rate_rmb_vnd || 3500}
+          onAddEventToDay={handleSmartAutoAddEvent}
+          onSelectDayView={(dayNum) => {
+            setSelectedDayNumber(dayNum);
+            if (viewMode === "all") {
+              const targetEl = document.getElementById(`day-section-${dayNum}`);
+              if (targetEl) {
+                targetEl.scrollIntoView({ behavior: "smooth", block: "start" });
+              }
+            }
+          }}
+        />
+      )}
 
       {/* Global Toast Container */}
       <Toaster position="top-center" richColors />
