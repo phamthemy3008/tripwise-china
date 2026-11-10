@@ -8,6 +8,7 @@ import fs from "fs";
 import path from "path";
 import { parseTripWithGemini, suggestActivities, suggestRestaurants, smartMatchActivity } from "./src/lib/gemini.js";
 import { SAMPLE_TRIPS } from "./src/data/sampleTrips.js";
+import { registerMcpRoutes } from "./src/server/mcpServer.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -70,6 +71,28 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // In-memory / server cache for trips
 let serverTrips = [...SAMPLE_TRIPS];
+
+// Register Model Context Protocol (MCP) Routes: SSE, JSON-RPC, Tools, Resources, Prompts
+registerMcpRoutes(app, {
+  getTrips: () => {
+    const combined: any[] = [...serverTrips];
+    for (const [id, trip] of Object.entries(sharedTripsStore)) {
+      if (!combined.some((t) => t.id === id)) {
+        combined.push(trip);
+      }
+    }
+    return combined;
+  },
+  saveTrip: (id: string, trip: any) => {
+    persistSharedTrip(id, trip);
+    const idx = serverTrips.findIndex((t) => t.id === id);
+    if (idx >= 0) {
+      serverTrips[idx] = trip;
+    } else {
+      serverTrips.unshift(trip);
+    }
+  },
+});
 
 // API: Parse Itinerary endpoint (File or Raw Text -> Gemini AI)
 app.post(

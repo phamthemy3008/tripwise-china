@@ -384,7 +384,7 @@
       "day_number": 7,
       "date": "Thứ Sáu, 20/11/2026",
       "city": "Trùng Khánh (Chongqing - 重庆)",
-      "title": "Đô Thị 3D – Tàu Xuyên Chung Cư Lý Tử Bá – Cáp Treo Dương Tử – Hồng Nhai Động",
+      "title": "Đô Thị 3D – Lý Tử Bá – Cáp Treo Dương Tử – Quán Âm Kiều – Hồng Nhai Động",
       "hotel": {
         "name_vn": "SENSE SCENE Sanshi Senyin Hotel (Tam Thời Sâm Ấn - Giải Phóng Bối)",
         "name_zh": "三时森印酒店（重庆解放碑步行街洪崖洞店）",
@@ -396,43 +396,49 @@
           "time_slot": "Sáng",
           "time_range": "08:30 - 12:00",
           "activity_title": "Phố cổ Từ Khí Khẩu & Mua quẩy vặn thừng mè Trần Ma Hoa",
-          "description": "Đi Metro Line 1 tham quan Phố cổ Từ Khí Khẩu nghìn năm tuổi ven sông Gia Lăng, ngắm kiến trúc cổ và thưởng thức canh cay Mao Huyết Vượng.",
+          "description": "Đi Metro Line 1 tham quan Phố cổ Từ Khí Khẩu (磁器口古镇), mua quẩy vặn thừng mè giòn rụm Trần Ma Hoa (陈麻花). Ăn trưa tại Mậu Trang Cổ Trấn Đệ Nhất Gia Mao Huyết Vượng (茂庄古镇第一家毛血旺): thưởng thức nồi canh cay thập cẩm Mao Huyết Vượng và cá nấu ớt cay nước đỏ (水煮鱼).",
           "place_name": "Phố cổ Từ Khí Khẩu (Ciqikou)",
-          "place_zh": "磁器口古镇",
+          "place_zh": "磁器口古镇 / 陈麻花",
           "amap_query": "磁器口古镇",
           "transport_hint": "Metro Line 1 ga Ciqikou",
           "duration_hint": "3.5 tiếng",
           "dishes": [
             {
-              "dish_name_vn": "Mao Huyết Vượng (Mậu Trang Cổ Trấn)",
+              "dish_name_vn": "Mao Huyết Vượng (Mậu Trang Cổ Trấn Đệ Nhất Gia)",
               "dish_name_zh": "茂庄古镇第一家毛血旺",
               "google_img_keyword": "重庆毛血旺",
               "baidu_img_keyword": "磁器口毛血旺"
+            },
+            {
+              "dish_name_vn": "Cá nấu ớt cay nước đỏ (Thủy Chử Ngư) & Quẩy Trần Ma Hoa",
+              "dish_name_zh": "水煮鱼 / 陈麻花",
+              "google_img_keyword": "重庆水煮鱼 陈麻花",
+              "baidu_img_keyword": "磁器口陈麻花"
             }
           ]
         },
         {
           "time_slot": "Chiều",
-          "time_range": "13:30 - 17:30",
-          "activity_title": "Ga tàu xuyên tòa nhà Lý Tử Bá & Cáp treo Sông Dương Tử",
-          "description": "Đi Metro Line 2 ngắm khoảnh khắc đoàn tàu lao xuyên qua lòng tòa nhà chung cư tại ga Lý Tử Bá. Trải nghiệm Cáp treo vượt sông Dương Tử ngắm toàn cảnh thành phố thẳng đứng.",
-          "place_name": "Ga Lý Tử Bá & Cáp treo Dương Tử",
-          "place_zh": "李子坝单轨站",
-          "amap_query": "李子坝观景平台",
-          "transport_hint": "Metro Line 2 & Cáp treo vượt sông Yangtze River Cableway",
-          "ticket_hint": "Vé cáp treo sông Dương Tử ~20 RMB một chiều",
-          "duration_hint": "4 tiếng"
+          "time_range": "13:30 - 19:30",
+          "activity_title": "Ga tàu xuyên chung cư Lý Tử Bá – Cáp treo Dương Tử – Phố đi bộ Quán Âm Kiều (观音桥)",
+          "description": "Đi Metro Line 2 ngắm tàu xuyên chung cư tại ga Lý Tử Bá (李子坝). Trải nghiệm Cáp treo vượt sông Dương Tử (长江索道) ngắm cảnh quan thành phố thẳng đứng. Ghé Phố đi bộ Quán Âm Kiều (观音桥步行街) check-in màn hình LED 3D ngoài trời khổng lồ và khám phá thiên đường ẩm thực ngầm sầm uất (观音桥好吃街).",
+          "place_name": "Ga Lý Tử Bá, Cáp treo Dương Tử & Phố đi bộ Quán Âm Kiều",
+          "place_zh": "李子坝单轨站 / 长江索道 / 观音桥步行街",
+          "amap_query": "观音桥步行街",
+          "transport_hint": "Metro Line 2 ga Liziba, Cáp treo vượt sông Dương Tử & Metro Line 3 ga Guanyinqiao (观音桥站)",
+          "ticket_hint": "Vé cáp treo sông Dương Tử ~20 RMB một chiều; Phố đi bộ Quán Âm Kiều & màn hình 3D miễn phí",
+          "duration_hint": "6 tiếng"
         },
         {
           "time_slot": "Tối",
-          "time_range": "18:00 - 21:30",
+          "time_range": "19:30 - 22:00",
           "activity_title": "Hồng Nhai Động lên đèn & Đại tiệc Lẩu cay Trùng Khánh",
-          "description": "Chiêm ngưỡng quần thể nhà sàn 11 tầng lộng lẫy tại Hồng Nhai Động tựa phim Spirited Away. Thưởng thức đại tiệc lẩu cay chuẩn vị tại Lẩu Bội Tỷ hoặc Lẩu Chu Sư Huynh.",
+          "description": "Chiêm ngưỡng quần thể nhà sàn 11 tầng rực rỡ tại Hồng Nhai Động (洪崖洞) (bối cảnh tựa phim Spirited Away). Đại tiệc lẩu cay tại Lẩu Bội Tỷ (佩姐老火锅) hoặc Lẩu Chu Sư Huynh (周师兄重庆火锅): dạ sách bò tươi nhúng 9 giây (鲜毛肚), ruột vịt giòn (鲜鸭肠), thịt bò tẩm ớt bột (麻辣牛肉), bánh nếp đường nâu chiên giòn (红糖糍粑).",
           "place_name": "Hồng Nhai Động (Hongyadong)",
           "place_zh": "洪崖洞民俗风貌区",
           "amap_query": "洪崖洞民俗风貌区",
           "transport_hint": "Đi bộ 10 phút từ Giải Phóng Bối",
-          "tips": "Góc ngắm Hồng Nhai Động trọn vẹn nhất là đứng từ trên cầu Thiên Môn hoặc bờ đối diện.",
+          "tips": "Không nên chen chúc bên trong nhà hàng; góc ngắm Hồng Nhai Động đẹp nhất là từ giữa cầu Thiên Môn hoặc bờ đối diện.",
           "dishes": [
             {
               "dish_name_vn": "Lẩu cay mỡ bò Trùng Khánh (Lẩu Bội Tỷ / Chu Sư Huynh)",
@@ -448,7 +454,7 @@
       "day_number": 8,
       "date": "Thứ Bảy, 21/11/2026",
       "city": "Trùng Khánh (Chongqing - 重庆)",
-      "title": "Bảo Tàng Tam Hiệp – Bạch Tượng Cư – Du Thuyền Đêm Triều Thiên Môn",
+      "title": "Bảo Tàng Tam Hiệp – Hội Quán Hồ Quảng – Hoàng Cát Cổ Đạo & Lão Quân Động – Bạch Tượng Cư – Triều Thiên Môn",
       "hotel": {
         "name_vn": "SENSE SCENE Sanshi Senyin Hotel (Tam Thời Sâm Ấn - Giải Phóng Bối)",
         "name_zh": "三时森印酒店（重庆解放碑步行街洪崖洞店）",
@@ -460,7 +466,7 @@
           "time_slot": "Sáng",
           "time_range": "09:00 - 12:00",
           "activity_title": "Bảo tàng Tam Hiệp & Đại Lễ Đường Nhân Dân",
-          "description": "Tham quan Bảo tàng Tam Hiệp tìm hiểu lịch sử đập thủy điện và văn hóa Ba Thục, ngắm kiến trúc mái vòm Đại lễ đường Nhân dân đối diện.",
+          "description": "Tham quan Bảo tàng Tam Hiệp (Three Gorges Museum) tìm hiểu lịch sử đập thủy điện và văn hóa Ba Thục, ngắm kiến trúc mái vòm Đại lễ đường Nhân dân Trùng Khánh đối diện. Ăn trưa tại Bàn Muội Diện Trang (胖妹面庄 - Michelin Bib Gourmand): mì Tiểu Diện Trùng Khánh tê cay hoa tiêu và mì bò kho gân mềm đậm đà.",
           "place_name": "Bảo tàng Tam Hiệp",
           "place_zh": "重庆中国三峡博物馆",
           "amap_query": "重庆中国三峡博物馆",
@@ -468,8 +474,8 @@
           "duration_hint": "3 tiếng",
           "dishes": [
             {
-              "dish_name_vn": "Mì Tiểu Diện Trùng Khánh (Bàn Muội Diện Trang - Michelin Bib)",
-              "dish_name_zh": "胖妹面庄 重庆小面",
+              "dish_name_vn": "Mì Tiểu Diện Trùng Khánh & Mì Bò Kho Gân (Bàn Muội Diện Trang)",
+              "dish_name_zh": "胖妹面庄 重庆小面 / 牛肉面",
               "google_img_keyword": "重庆小面 胖妹面庄",
               "baidu_img_keyword": "胖妹面庄 重庆小面"
             }
@@ -478,27 +484,28 @@
         {
           "time_slot": "Chiều",
           "time_range": "13:30 - 17:30",
-          "activity_title": "Bạch Tượng Cư 24 tầng & Quảng trường Triều Thiên Môn",
-          "description": "Dạo ngõ dốc chung cư 24 tầng không thang máy Bạch Tượng Cư ngắm cáp treo lướt ngang qua đầu. Đến Quảng trường Triều Thiên Môn ngắm ngã ba sông Dương Tử và Gia Lăng bên tổ hợp Raffles City.",
-          "place_name": "Bạch Tượng Cư & Triều Thiên Môn",
-          "place_zh": "白象居",
-          "amap_query": "白象居",
-          "transport_hint": "Đi bộ dạo ngõ dốc hoặc Metro Line 1 ga Chaotianmen",
+          "activity_title": "Hội Quán Hồ Quảng – Đường cổ Hoàng Cát & Đạo quán Lão Quân Động – Bạch Tượng Cư & Triều Thiên Môn",
+          "description": "Khám phá Hội quán Hồ Quảng (Huguang Guild Hall - 重庆湖广会馆) với tường vàng cổ kính ven sông. Sang bờ Nam tản bộ trên Đường cổ Hoàng Cát (黄葛古道), ngắm thạch khắc tượng Phật cổ Cổ Phật Nham (古佛岩), và lên viếng Đạo quán Lão Quân Động (老君洞道观) ngắm hoàng hôn cùng toàn cảnh bán đảo Du Trung 3D tuyệt đẹp từ trên cao. Sau đó qua ngõ dốc chung cư 24 tầng không thang máy Bạch Tượng Cư (白象居) và Quảng trường Triều Thiên Môn (朝天门).",
+          "place_name": "Hội Quán Hồ Quảng, Lão Quân Động, Bạch Tượng Cư & Triều Thiên Môn",
+          "place_zh": "重庆湖广会馆 / 黄葛古道 / 老君洞道观 / 白象居 / 朝天门",
+          "amap_query": "重庆湖广会馆",
+          "transport_hint": "Metro Line 1 ga Xiaoshizi / Chaotianmen & Metro Line 6 / Taxi sang Thượng Tân Nhai",
+          "ticket_hint": "Vé Hội quán Hồ Quảng ~25 RMB; Đạo quán Lão Quân Động, Hoàng Cát Cổ Đạo & Bạch Tượng Cư miễn phí",
           "duration_hint": "4 tiếng"
         },
         {
           "time_slot": "Tối",
           "time_range": "18:30 - 21:30",
-          "activity_title": "Thưởng thức Gà Cay Trùng Khánh & Du thuyền ngắm Cyberpunk",
-          "description": "Ăn tối gà cay ngập trong ớt khô và hạt hoa tiêu tại Dân Gian Lương Thương. Lên du thuyền đêm sông Dương Tử chiêm ngưỡng đường chân trời cyberpunk rực rỡ.",
-          "place_name": "Du thuyền Triều Thiên Môn",
-          "place_zh": "朝天门两江游船",
+          "activity_title": "Ăn tối Dân Gian Lương Thương & Du thuyền đêm ngắm Cyberpunk",
+          "description": "Ăn tối tại Dân Gian Lương Thương Trùng Khánh Thái (民间粮仓·重庆菜): gà cay Trùng Khánh ngập trong ớt khô và tiêu (辣子鸡), sườn nướng mác mật. Sau đó đi du thuyền đêm sông Dương Tử ngắm đường chân trời cyberpunk rực rỡ.",
+          "place_name": "Dân Gian Lương Thương & Du thuyền Triều Thiên Môn",
+          "place_zh": "民间粮仓·重庆菜 / 朝天门两江游船",
           "amap_query": "朝天门码头",
           "ticket_hint": "Vé du thuyền đêm Lưỡng Giang ~150 RMB",
           "dishes": [
             {
-              "dish_name_vn": "Gà cay Trùng Khánh (Là Tử Kê)",
-              "dish_name_zh": "重庆辣子鸡",
+              "dish_name_vn": "Gà cay Trùng Khánh (Là Tử Kê) & Sườn nướng mác mật",
+              "dish_name_zh": "民间粮仓 重庆辣子鸡",
               "google_img_keyword": "重庆辣子鸡",
               "baidu_img_keyword": "重庆传统辣子鸡"
             }
@@ -509,8 +516,8 @@
     {
       "day_number": 9,
       "date": "Chủ Nhật, 22/11/2026",
-      "city": "Trùng Khánh & Đại Túc (Dazu - 大足)",
-      "title": "Day-trip Di Sản Thế Giới Đại Túc Thạch Khắc (Bảo Đỉnh Sơn & Bắc Sơn)",
+      "city": "Trùng Khánh – Quận Bắc Bội (Beibei - 北碚)",
+      "title": "Núi Kim Vân & Cổ Trấn Kim Cương Bi (Quận Bắc Bội) – Lẩu Xiên Que Giải Phóng Bối",
       "hotel": {
         "name_vn": "SENSE SCENE Sanshi Senyin Hotel (Tam Thời Sâm Ấn - Giải Phóng Bối)",
         "name_zh": "三时森印酒店（重庆解放碑步行街洪崖洞店）",
@@ -520,47 +527,64 @@
       "events": [
         {
           "time_slot": "Sáng",
-          "time_range": "08:00 - 12:00",
-          "activity_title": "Chiêm ngưỡng Đại Túc Thạch Khắc – Tượng Phật Nằm 31m",
-          "description": "Di chuyển bằng xe buýt du lịch trực tiếp hoặc tàu cao tốc đến huyện Đại Túc. Chiêm ngưỡng Di sản Thế giới Đại Túc Thạch Khắc tại Bảo Đỉnh Sơn: Tượng Phật Thích Ca Nhập Niết Bàn dài 31m và tượng Phật Bà Quan Âm Nghìn Mắt Nghìn Tay mạ vàng tinh xảo.",
-          "place_name": "Đại Túc Thạch Khắc (Bảo Đỉnh Sơn)",
-          "place_zh": "大足石刻宝顶山景区",
-          "amap_query": "大足石刻宝顶山景区",
-          "transport_hint": "Xe du lịch trực tiếp đón tại Giải Phóng Bối hoặc tàu Gaotie đến Ga Đại Túc Nam",
-          "ticket_hint": "Vé trọn gói Bảo Đỉnh Sơn & Bắc Sơn ~140 RMB",
-          "duration_hint": "4 tiếng",
+          "time_range": "08:30 - 12:00",
+          "activity_title": "Metro Line 6 đi Quận Bắc Bội – Cáp treo Núi Kim Vân (缙云山) & Chùa Kim Vân Tự",
+          "description": "Từ trạm Xiaoshizi (cạnh khách sạn SENSE SCENE Giải Phóng Bối), đi thẳng Metro Line 6 đến ga Bắc Bội (Beibei - 北碚站, khoảng 55 phút). Bắt taxi khoảng 10 phút đến Núi Kim Vân (缙云山). Đi cáp treo xuyên qua rừng trúc nguyên sinh bạt ngàn lên đỉnh ngắm toàn cảnh sông Gia Lăng uốn lượn qua hẻm núi Ôn Đường Hiệp mờ sương và viếng Chùa Kim Vân Tự cổ kính. Ăn trưa tại các nhà hàng ven suối: đậu phụ suối nóng Bắc Bội, cá sông Gia Lăng hấp và măng trúc rừng xào thịt hun khói.",
+          "place_name": "Núi Kim Vân (Mount Jinyun - Quận Bắc Bội)",
+          "place_zh": "缙云山国家级自然保护区 / 缙云山索道",
+          "amap_query": "重庆缙云山景区",
+          "transport_hint": "Đi thẳng Metro Line 6 từ ga Xiaoshizi đến ga Beibei (北碚站, ~55 phút), bắt taxi 10 phút vào Núi Kim Vân",
+          "duration_hint": "3.5 tiếng",
           "dishes": [
             {
-              "dish_name_vn": "Cá diếc Bưu Đình om tương cay ngọt Đại Túc",
-              "dish_name_zh": "大足邮亭鲫鱼",
-              "google_img_keyword": "邮亭鲫鱼",
-              "baidu_img_keyword": "大足邮亭鲫鱼"
+              "dish_name_vn": "Đậu phụ suối nóng Bắc Bội & Cá sông Gia Lăng hấp",
+              "dish_name_zh": "北碚豆花 / 嘉陵江清蒸鱼",
+              "google_img_keyword": "重庆北碚豆花 嘉陵江鱼",
+              "baidu_img_keyword": "北碚豆花 嘉陵江清蒸鱼"
+            },
+            {
+              "dish_name_vn": "Măng trúc rừng xào thịt hun khói",
+              "dish_name_zh": "竹笋炒腊肉",
+              "google_img_keyword": "缙云山竹笋炒腊肉",
+              "baidu_img_keyword": "竹笋炒腊肉"
             }
           ]
         },
         {
           "time_slot": "Chiều",
-          "time_range": "13:30 - 16:30",
-          "activity_title": "Bảo tàng Thạch khắc & Cụm chạm khắc vách đá Bắc Sơn",
-          "description": "Tham quan Bảo tàng Thạch khắc Đại Túc và cụm vách đá Bắc Sơn với hàng nghìn tượng Phật chạm khắc tinh xảo từ thời Đường - Tống.",
-          "place_name": "Đại Túc Thạch Khắc (Bắc Sơn)",
-          "place_zh": "大足北山石刻",
-          "amap_query": "大足北山石刻",
-          "duration_hint": "3 tiếng"
+          "time_range": "13:30 - 17:30",
+          "activity_title": "Tản bộ Cổ trấn Kim Cương Bi (金刚碑古镇) & Thưởng trà nắp ấm ven sông Gia Lăng",
+          "description": "Xuống chân núi, di chuyển sang Cổ trấn Kim Cương Bi (金刚碑古镇) — ngôi làng cổ hơn 300 năm tuổi nằm ẩn mình trong khe núi rợp bóng cây đa cổ thụ sát bờ sông Gia Lăng. Tản bộ trên những con dốc lát đá rêu phong dọc dòng suối chảy róc rách, chọn một trà quán sân vườn gỗ ven suối hoặc ven sông Gia Lăng để ngồi ghế mây thưởng thức trà hoa nhài nắp đậy (盖碗茉莉花茶) trong không gian yên bình.",
+          "place_name": "Cổ trấn Kim Cương Bi (Jingangbei Ancient Town)",
+          "place_zh": "北碚金刚碑古镇",
+          "amap_query": "北碚金刚碑历史文化街区",
+          "transport_hint": "Taxi 10 phút từ chân núi Kim Vân sang Cổ trấn Kim Cương Bi",
+          "duration_hint": "4 tiếng",
+          "ticket_hint": "Vào cửa tự do, miễn phí vé tham quan",
+          "dishes": [
+            {
+              "dish_name_vn": "Trà hoa nhài nắp đậy cái oản ven suối Kim Cương Bi",
+              "dish_name_zh": "盖碗茉莉花茶",
+              "google_img_keyword": "金刚碑古镇 盖碗茶",
+              "baidu_img_keyword": "北碚金刚碑古镇 茶馆"
+            }
+          ]
         },
         {
           "time_slot": "Tối",
           "time_range": "18:00 - 21:00",
-          "activity_title": "Lẩu xiên que Trùng Khánh & Chuẩn bị sang Thành Đô",
-          "description": "Quay về trung tâm Trùng Khánh. Thưởng thức lẩu xiên que tại tiệm Cương Quản Xưởng hoặc Lý Xuyến Xuyến. Đóng gói hành lý chuẩn bị sang Tứ Xuyên sáng mai.",
-          "place_name": "Lẩu xiên que Giải Phóng Bối",
-          "place_zh": "重庆串串香",
+          "activity_title": "Metro Line 6 về Giải Phóng Bối – Lẩu xiên que Lý Xuyến Xuyến / Cương Quản Xưởng",
+          "description": "Đi Metro Line 6 về lại trung tâm Giải Phóng Bối. Thưởng thức bữa tối lẩu xiên que (串串香 - Chuan Chuan Xiang) tại Lý Xuyến Xuyến (李串串) hoặc Cương Quản Xưởng Tiểu Quận Can (钢管厂五区小郡肝串串香). Quay về khách sạn SENSE SCENE thu dọn hành lý, chuẩn bị cho chuyến tàu sang Thành Đô vào sáng hôm sau (23/11).",
+          "place_name": "Lẩu xiên que Giải Phóng Bối (Lý Xuyến Xuyến / Cương Quản Xưởng)",
+          "place_zh": "李串串老店 / 钢管厂五区小郡肝串串香",
           "amap_query": "钢管厂五区小郡肝串串香",
+          "transport_hint": "Đón Metro Line 6 từ ga Beibei (北碚站) về thẳng ga Xiaoshizi (小什字站)",
+          "duration_hint": "3 tiếng",
           "dishes": [
             {
-              "dish_name_vn": "Lẩu xiên que Trùng Khánh (Xuyến Xuyến Hương)",
-              "dish_name_zh": "重庆串串香",
-              "google_img_keyword": "重庆串串香",
+              "dish_name_vn": "Lẩu xiên que Trùng Khánh (Lý Xuyến Xuyến / Cương Quản Xưởng Tiểu Quận Can)",
+              "dish_name_zh": "李串串 / 钢管厂五区小郡肝串串香",
+              "google_img_keyword": "重庆串串香 小郡肝",
               "baidu_img_keyword": "小郡肝串串香"
             }
           ]

@@ -31,9 +31,11 @@ import { StationEditModal } from "./components/StationEditModal";
 import { HotelCostCalculatorModal } from "./components/HotelCostCalculatorModal";
 import { TransportCostCalculatorModal, TransportType } from "./components/TransportCostCalculatorModal";
 import { SmartAutoAddModal } from "./components/SmartAutoAddModal";
+import { McpHubModal } from "./components/McpHubModal";
 import { DayPlan } from "./types/itinerary";
 import { calculateTripBudgetSummary } from "./lib/budgetUtils";
 import {
+  Server,
   Compass,
   Plus,
   Share2,
@@ -102,6 +104,7 @@ function MainApp() {
   const [isSyncingGoogleDoc, setIsSyncingGoogleDoc] = useState<boolean>(false);
   const [isSuggestModalOpen, setIsSuggestModalOpen] = useState<boolean>(false);
   const [isSmartAutoAddOpen, setIsSmartAutoAddOpen] = useState<boolean>(false);
+  const [isMcpHubOpen, setIsMcpHubOpen] = useState<boolean>(false);
 
   // Sharing & Collaboration states
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
@@ -849,6 +852,21 @@ function MainApp() {
               </p>
             </div>
           </div>
+
+            {/* MCP Server Protocol Hub */}
+            <button
+              type="button"
+              onClick={() => setIsMcpHubOpen(true)}
+              className="relative flex items-center gap-1.5 py-1.5 px-2.5 sm:px-3 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 text-xs font-bold border border-emerald-500/40 transition-all cursor-pointer shadow-xs active:scale-95"
+              title="Model Context Protocol (MCP) Server - Kết nối công cụ du lịch với Claude Desktop, Cursor và AI Agents"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <Server className="w-3.5 h-3.5 text-emerald-400" />
+              <span>MCP <span className="hidden sm:inline">Server</span></span>
+            </button>
 
             {/* Budget Tracker Button */}
             {currentTrip && (
@@ -2042,6 +2060,14 @@ function MainApp() {
           }}
         />
       )}
+
+      {/* Model Context Protocol (MCP) Hub & Inspector Modal */}
+      <McpHubModal
+        isOpen={isMcpHubOpen}
+        onClose={() => setIsMcpHubOpen(false)}
+        currentTrip={currentTrip}
+        onTripUpdated={handleSaveUpdatedTrip}
+      />
 
       {/* Global Toast Container */}
       <Toaster position="top-center" richColors />

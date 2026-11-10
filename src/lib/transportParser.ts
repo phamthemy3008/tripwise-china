@@ -59,6 +59,9 @@ export const KNOWN_METRO_STATIONS: Record<string, StationEntry> = {
   qixinggang: { vn: "Ga Thất Tinh Cương (Qixinggang)", zh: "七星岗站", pinyin: "Qixinggang" },
   chongqingbei_subway: { vn: "Ga Trùng Khánh Bắc (Chongqing North Station South Square)", zh: "重庆北站南广场站", pinyin: "Chongqing North Station South Square" },
   chongqingbei_north_subway: { vn: "Ga Trùng Khánh Bắc (Chongqing North Station North Square)", zh: "重庆北站北广场站", pinyin: "Chongqing North Station North Square" },
+  guanyinqiao: { vn: "Ga Quán Âm Kiều (Guanyinqiao)", zh: "观音桥站", pinyin: "Guanyinqiao" },
+  beibei: { vn: "Ga Bắc Bội (Beibei)", zh: "北碚站", pinyin: "Beibei" },
+  shangxinjie: { vn: "Ga Thượng Tân Nhai (Shangxinjie)", zh: "上新街站", pinyin: "Shangxinjie" },
 
   // Thành Đô (Chengdu)
   tianfu: { vn: "Ga Quảng trường Thiên Phủ (Tianfu Square)", zh: "天府广场站", pinyin: "Tianfu Square" },
@@ -476,6 +479,9 @@ export function getStationPinyin(stationVn: string, stationZh: string): string {
       "武隆": "Wulong",
       "武隆南": "Wulong South",
       "大足南": "Dazu South",
+      "观音桥": "Guanyinqiao",
+      "北碚": "Beibei",
+      "上新街": "Shangxinjie",
 
       // Chengdu
       "天府广场": "Tianfu Square",

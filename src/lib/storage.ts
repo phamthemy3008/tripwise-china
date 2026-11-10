@@ -1,5 +1,6 @@
 import { TripDocument } from "../types/itinerary";
 import { SAMPLE_TRIPS } from "../data/sampleTrips";
+import { upgradeTripsWithFullSample } from "./firestoreTrips";
 
 const STORAGE_KEY = "tripwise_china_trips";
 const ACTIVE_TRIP_ID_KEY = "tripwise_china_active_id";
@@ -17,7 +18,11 @@ export function getSavedTrips(): TripDocument[] {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(SAMPLE_TRIPS));
       return SAMPLE_TRIPS;
     }
-    return trips;
+    const { upgraded, hasChanges } = upgradeTripsWithFullSample(trips);
+    if (hasChanges) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(upgraded));
+    }
+    return upgraded;
   } catch (e) {
     console.warn("Error reading localStorage trips, falling back to samples:", e);
     return SAMPLE_TRIPS;

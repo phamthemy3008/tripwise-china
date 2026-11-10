@@ -1235,6 +1235,137 @@ export function heuristicSmartMatch(
     };
   }
 
+  // Case 1.1: Hội Quán Hồ Quảng (Chongqing Huguang Guild Hall)
+  if (
+    q.includes("huguang") ||
+    q.includes("hồ quảng") ||
+    q.includes("hội quán") ||
+    q.includes("湖广") ||
+    q.includes("湖广会馆")
+  ) {
+    const cqDays = findDaysByCity("Trùng Khánh").length > 0 ? findDaysByCity("Trùng Khánh") : findDaysByCity("Chongqing");
+    const matchedDay = cqDays.find((d) => d.day_number === 8) || cqDays[0] || days[0];
+    const altDays = cqDays.map((d) => d.day_number).filter((num) => num !== matchedDay.day_number);
+
+    return {
+      matched_day_number: matchedDay.day_number,
+      matched_city: "Trùng Khánh",
+      confidence_score: 99,
+      match_reason: `Hội quán Hồ Quảng (重庆湖广会馆) xây dựng năm 1759 bên bờ sông Dương Tử dưới chân Cầu Đông Thủy Môn. Ngày ${matchedDay.day_number} bạn đang ở khu vực Bạch Tượng Cư và Triều Thiên Môn, ghé thăm Hội quán Hồ Quảng là hành trình liền mạch tuyệt đẹp!`,
+      alternative_days: altDays,
+      event: {
+        time_slot: "Chiều",
+        time_range: "14:00 - 16:00",
+        activity_title: "Tham quan Hội Quán Hồ Quảng Trùng Khánh (Huguang Guild Hall)",
+        description: "Khám phá quần thể hội quán cổ lớn nhất Tây Nam Trung Hoa xây dựng từ năm Càn Long thứ 24 (1759). Chiêm ngưỡng 'Vạn Lập Hoàng Tường' tường vàng uốn lượn, Cổ Hí Đài chạm lọng sơn son thếp vàng tinh xảo và góc chụp tương phản tuyệt đẹp ngay chân cầu Đông Thủy Môn đỏ rực.",
+        place_name: "Hội Quán Hồ Quảng Trùng Khánh (Huguang Guild Hall)",
+        place_zh: "重庆湖广会馆",
+        amap_query: "重庆湖广会馆",
+        transport_hint: "Đi bộ 8 phút từ ga Metro Tiểu Thập Tự (Xiaoshizi Cổng 8) hoặc từ Bạch Tượng Cư tản bộ dọc đường Trường Tân xuống chân cầu.",
+        ticket_hint: "Vé vào cửa ~25 RMB/người.",
+        duration_hint: "Khoảng 2 tiếng",
+        tips: "Góc chụp ảnh đắt giá nhất là đứng từ sân chính ngắm bức tường vàng đối lập với nhịp cầu dây văng hiện đại màu đỏ rực phía trên.",
+        cost_rmb: 25,
+        cost_category: "ticket",
+      },
+    };
+  }
+
+  // Case 1.2: Guanyinqiao (Quán Âm Kiều - Màn hình LED 3D & Phố ẩm thực Haochijie)
+  if (
+    q.includes("guanyinqiao") ||
+    q.includes("quán âm kiều") ||
+    q.includes("quan am kieu") ||
+    q.includes("màn hình 3d") ||
+    q.includes("3d screen") ||
+    q.includes("naked eye") ||
+    q.includes("haochijie") ||
+    q.includes("观音桥")
+  ) {
+    const cqDays = findDaysByCity("Trùng Khánh").length > 0 ? findDaysByCity("Trùng Khánh") : findDaysByCity("Chongqing");
+    const matchedDay = cqDays.find((d) => d.day_number === 7) || cqDays[0] || days[0];
+    const altDays = cqDays.map((d) => d.day_number).filter((num) => num !== matchedDay.day_number);
+
+    return {
+      matched_day_number: matchedDay.day_number,
+      matched_city: "Trùng Khánh",
+      confidence_score: 99,
+      match_reason: `Theo lịch trình chính thức, Quán Âm Kiều (观音桥步行街) kết hợp cùng Tàu điện Liziba và Cáp treo sông Dương Tử vào chiều – tối Ngày ${matchedDay.day_number}. Đây là thời điểm lý tưởng để check-in Màn hình LED 3D khổng lồ và ăn vặt tại khu ẩm thực ngầm trước khi về Hồng Nhai Động!`,
+      alternative_days: altDays,
+      event: {
+        time_slot: "Chiều",
+        time_range: "16:30 - 19:00",
+        activity_title: "Phố đi bộ Quán Âm Kiều (观音桥步行街) & Màn hình LED 3D",
+        description: "Bắt tàu điện ngầm sang khu thương mại sầm uất bậc nhất của giới trẻ Trùng Khánh. Check-in màn hình LED 3D khổng lồ và dạo khu ẩm thực ngầm nhộn nhịp.",
+        place_name: "Phố đi bộ Quán Âm Kiều & Màn hình 3D (Guanyinqiao)",
+        place_zh: "观音桥步行街 (观音桥裸眼3D大屏 / 观音桥好吃街)",
+        amap_query: "观音桥步行街",
+        transport_hint: "Metro Line 3 hoặc Line 9 đến ga Quán Âm Kiều (Guanyinqiao Station - 观音桥站 Cổng 4/5).",
+        ticket_hint: "Vào cửa tự do phố đi bộ và khu màn hình 3D; ẩm thực ăn vặt tự túc.",
+        duration_hint: "Khoảng 2.5 tiếng",
+        tips: "Màn hình 3D lên đèn rực rỡ nhất lúc chạng vạng tối.",
+        cost_rmb: 65,
+        cost_category: "food",
+        dishes: [
+          {
+            dish_name_vn: "Bánh bao chiên áp chảo súp giòn rụm",
+            dish_name_zh: "观音桥生煎包",
+            restaurant_name: "Quán Âm Kiều Haochijie",
+            restaurant_zh: "观音桥好吃街",
+            price_range: "~15 - 25 ¥/phần",
+          },
+          {
+            dish_name_vn: "Thịt thỏ nướng xé cay thơm Tứ Xuyên",
+            dish_name_zh: "王饱仔手撕烤兔",
+            restaurant_name: "Vương Bào Tể",
+            restaurant_zh: "王饱仔手撕烤兔",
+            price_range: "~35 - 55 ¥/phần",
+          },
+        ],
+      },
+    };
+  }
+
+  // Case 1.3: Núi Kim Vân (Mount Jinyun - 缙云山) & Cổ trấn Kim Cương Bi (Jingangbei - 金刚碑古镇)
+  if (
+    q.includes("kim vân") ||
+    q.includes("jinyun") ||
+    q.includes("kim cương bi") ||
+    q.includes("jingangbei") ||
+    q.includes("bắc bội") ||
+    q.includes("beibei") ||
+    q.includes("缙云山") ||
+    q.includes("金刚碑") ||
+    q.includes("北碚")
+  ) {
+    const cqDays = findDaysByCity("Trùng Khánh").length > 0 ? findDaysByCity("Trùng Khánh") : findDaysByCity("Chongqing");
+    const matchedDay = cqDays.find((d) => d.day_number === 9) || cqDays[0] || days[0];
+    const altDays = cqDays.map((d) => d.day_number).filter((num) => num !== matchedDay.day_number);
+
+    return {
+      matched_day_number: matchedDay.day_number,
+      matched_city: "Trùng Khánh (Bắc Bội)",
+      confidence_score: 99,
+      match_reason: `Theo lịch trình chính thức, Ngày ${matchedDay.day_number} dành trọn cho chuyến dã ngoại sinh thái Quận Bắc Bội (北碚): buổi sáng đi cáp treo Núi Kim Vân (缙云山), buổi chiều tản bộ thưởng trà nắp ấm hoa nhài bên suối tại Cổ trấn Kim Cương Bi (金刚碑古镇).`,
+      alternative_days: altDays,
+      event: {
+        time_slot: "Chiều",
+        time_range: "13:30 - 17:30",
+        activity_title: "Cổ trấn Kim Cương Bi (金刚碑古镇) & Trà chiều bên suối",
+        description: "Từ chân núi Kim Vân đi bộ hoặc đón xe điện xuống Cổ trấn Kim Cương Bi – ngôi làng cổ 300 năm tuổi ẩn mình trong hẻm núi rợp bóng cây đa cổ thụ, nối thẳng ra sông Gia Lăng.",
+        place_name: "Cổ trấn Kim Cương Bi (Jingangbei Ancient Town)",
+        place_zh: "北碚金刚碑古镇",
+        amap_query: "北碚金刚碑历史文化街区",
+        transport_hint: "Metro Line 6 từ Tiểu Thập Tự đến Ga Bắc Bội (北碚站) rồi đi taxi 10 phút.",
+        ticket_hint: "Cổ trấn Kim Cương Bi mở cửa miễn phí.",
+        duration_hint: "Khoảng 4 tiếng",
+        tips: "Trải nghiệm thưởng trà nắp ấm hoa nhài (Gaiwan Tea) tại các quán trà cổ bên bờ suối chảy róc rách.",
+        cost_rmb: 45,
+        cost_category: "food",
+      },
+    };
+  }
+
   // Case 2: Bá Vương Trà Cơ (Chagee Milk Tea)
   if (
     q.includes("bá vương") ||

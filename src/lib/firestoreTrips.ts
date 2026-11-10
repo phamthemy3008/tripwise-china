@@ -114,9 +114,15 @@ export function healStationNamesInTrip(trip: TripDocument): { trip: TripDocument
       return newEvt;
     });
 
-    // 7. Update Day 14 hotel if still has old hotel
+    // 7. Update Day 14 hotel if still has old hotel or old price
     let updatedHotel = day.hotel;
-    if (day.day_number === 14 && (!day.hotel || day.hotel.name_zh?.includes("峨眉山院子") || day.hotel.name_zh?.includes("静竹时光"))) {
+    if (
+      day.day_number === 14 &&
+      (!day.hotel ||
+        day.hotel.name_zh?.includes("峨眉山院子") ||
+        day.hotel.name_zh?.includes("静竹时光") ||
+        !day.hotel.price_hint?.includes("627"))
+    ) {
       if (sampleDay?.hotel) {
         updatedHotel = sampleDay.hotel;
         dayChanged = true;
@@ -124,8 +130,83 @@ export function healStationNamesInTrip(trip: TripDocument): { trip: TripDocument
       }
     }
 
-    // 8. Update Day 9 if still has old Dazu Rock Carvings
-    if (day.day_number === 9 && (day.title?.includes("Đại Túc") || day.city?.includes("Đại Túc") || day.events?.some((e) => e.place_name?.includes("Đại Túc")))) {
+    // 8. Update Day 1 if lacks official PNR PT1MQ4
+    if (
+      day.day_number === 1 &&
+      !day.events?.some((e) => e.ticket_hint?.includes("PT1MQ4") || e.description?.includes("C7548251"))
+    ) {
+      if (sampleDay) {
+        dayChanged = true;
+        changed = true;
+        return {
+          ...day,
+          title: sampleDay.title,
+          events: sampleDay.events,
+        };
+      }
+    }
+
+    // 9. Update Day 7 if lacks Guanyinqiao (Quán Âm Kiều / 观音桥) in afternoon
+    if (
+      day.day_number === 7 &&
+      !day.events?.some(
+        (e) =>
+          e.place_name?.includes("Quán Âm Kiều") ||
+          e.place_zh?.includes("观音桥") ||
+          e.activity_title?.includes("Quán Âm Kiều") ||
+          e.activity_title?.includes("Guanyinqiao")
+      )
+    ) {
+      if (sampleDay) {
+        dayChanged = true;
+        changed = true;
+        return {
+          ...day,
+          title: sampleDay.title,
+          events: sampleDay.events,
+        };
+      }
+    }
+
+    // 10. Update Day 8 if lacks Huguang Guild Hall (湖广会馆) or Laojundong (老君洞)
+    if (
+      day.day_number === 8 &&
+      (!day.events?.some(
+        (e) =>
+          e.place_name?.includes("Hồ Quảng") ||
+          e.place_zh?.includes("湖广会馆") ||
+          e.activity_title?.includes("Hồ Quảng") ||
+          e.activity_title?.includes("Huguang")
+      ) ||
+        !day.events?.some(
+          (e) =>
+            e.place_zh?.includes("老君洞") ||
+            e.activity_title?.includes("Lão Quân Động") ||
+            e.description?.includes("Lão Quân Động")
+        ))
+    ) {
+      if (sampleDay) {
+        dayChanged = true;
+        changed = true;
+        return {
+          ...day,
+          title: sampleDay.title,
+          events: sampleDay.events,
+        };
+      }
+    }
+
+    // 11. Update Day 9 if lacks Mount Jinyun (Núi Kim Vân / 缙云山) & Jingangbei (Cổ trấn Kim Cương Bi / 金刚碑)
+    if (
+      day.day_number === 9 &&
+      !day.events?.some(
+        (e) =>
+          e.place_name?.includes("Kim Vân") ||
+          e.place_zh?.includes("缙云山") ||
+          e.place_name?.includes("Kim Cương Bi") ||
+          e.place_zh?.includes("金刚碑")
+      )
+    ) {
       if (sampleDay) {
         dayChanged = true;
         changed = true;
@@ -147,14 +228,23 @@ export function healStationNamesInTrip(trip: TripDocument): { trip: TripDocument
 
   let healedTrip = changed ? { ...trip, days: healedDays } : trip;
 
-  // Backfill category budget caps if missing
-  if (isZhangjiajieTrip && !healedTrip.category_budget_caps && fullSample?.category_budget_caps) {
-    healedTrip = {
-      ...healedTrip,
-      category_budget_caps: fullSample.category_budget_caps,
-      budget_cap_rmb: healedTrip.budget_cap_rmb || fullSample.budget_cap_rmb,
-    };
-    changed = true;
+  // Backfill official exchange rate (3857.1 VND/RMB) and category budget caps
+  if (isZhangjiajieTrip) {
+    if (!healedTrip.exchange_rate_rmb_vnd || healedTrip.exchange_rate_rmb_vnd === 3500) {
+      healedTrip = {
+        ...healedTrip,
+        exchange_rate_rmb_vnd: fullSample?.exchange_rate_rmb_vnd || 3857.1,
+      };
+      changed = true;
+    }
+    if (!healedTrip.category_budget_caps && fullSample?.category_budget_caps) {
+      healedTrip = {
+        ...healedTrip,
+        category_budget_caps: fullSample.category_budget_caps,
+        budget_cap_rmb: healedTrip.budget_cap_rmb || fullSample.budget_cap_rmb,
+      };
+      changed = true;
+    }
   }
 
   return {

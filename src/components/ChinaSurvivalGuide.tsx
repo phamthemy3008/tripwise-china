@@ -90,41 +90,67 @@ export const ChinaSurvivalGuide: React.FC<ChinaSurvivalGuideProps> = ({
             </p>
           </div>
 
-          {/* Item 5: Giao tiếp phiên dịch */}
+          {/* Item 5: Giao tiếp phiên dịch & Địa danh chính thức */}
           <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-700/60">
             <div className="flex items-center gap-2.5 font-bold text-slate-900 dark:text-white mb-2">
               <Smartphone className="w-4 h-4 text-amber-500" />
-              <span>5. Các câu giao tiếp khẩn cấp chữ Hán</span>
+              <span>5. Bảng từ vựng giao tiếp &amp; Địa danh chính thức</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
               <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
                 <span>Nhà vệ sinh ở đâu?</span>
-                <CopyChip text="请问洗手间在哪里？" label="洗手间" />
+                <CopyChip text="请问洗手间在哪里？" label="洗手间 (Xǐshǒujiān)" />
               </div>
               <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                <span>Không lấy ớt cay:</span>
-                <CopyChip text="不要辣，一点辣都不要" label="不要辣" />
+                <span>Không cay / Ít cay:</span>
+                <CopyChip text="不要辣 / 微辣" label="不要辣 / 微辣" />
               </div>
               <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                <span>Xin hóa đơn / biên nhận:</span>
-                <CopyChip text="请给我发票 / 小票" label="请给发票" />
+                <span>Cổ trấn Kim Cương Bi (Bắc Bội):</span>
+                <CopyChip text="北碚金刚碑古镇" label="北碚金刚碑古镇" />
               </div>
               <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                <span>Tôi muốn đi đến địa chỉ này:</span>
-                <CopyChip text="师傅，请送我到这个地方" label="师傅送我到..." />
+                <span>Núi Kim Vân (Bắc Bội):</span>
+                <CopyChip text="北碚缙云山" label="北碚缙云山" />
               </div>
               <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                <span>Phố cổ Long Môn Hạo:</span>
-                <CopyChip text="龙门浩老街" label="龙门浩老街 (Lóngménhào)" />
+                <span>Phố đi bộ Quán Âm Kiều:</span>
+                <CopyChip text="观音桥步行街" label="观音桥步行街" />
               </div>
               <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                <span>Công viên Nhân Dân:</span>
-                <CopyChip text="人民公园" label="人民公园 (Rénmín)" />
+                <span>Hội quán Hồ Quảng &amp; Lão Quân Động:</span>
+                <CopyChip text="重庆湖广会馆 / 老君洞道观" label="湖广会馆 / 老君洞" />
+              </div>
+              <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <span>Resort Thiên Cảnh Nga Mi Sơn:</span>
+                <CopyChip text="峨眉山天境度假酒店" label="峨眉山天境度假酒店" />
               </div>
               <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
                 <span>Trà nắp ấm (Gaiwan Tea):</span>
                 <CopyChip text="盖碗茶" label="盖碗茶 (Gàiwǎnchá)" />
               </div>
+            </div>
+          </div>
+
+          {/* Item 6: Thông tin liên hệ khẩn cấp */}
+          <div className="bg-red-50/70 dark:bg-red-950/25 p-4 rounded-2xl border border-red-200 dark:border-red-900/50">
+            <div className="flex items-center gap-2.5 font-bold text-red-900 dark:text-red-300 mb-2">
+              <Shield className="w-4 h-4 text-red-600 dark:text-red-400" />
+              <span>6. Thông tin liên hệ khẩn cấp tại Trung Quốc</span>
+            </div>
+            <div className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+              <p>
+                <strong>Số khẩn cấp nội địa TQ:</strong> Cảnh sát <strong>110</strong> | Cấp cứu y tế <strong>120</strong> | Cứu hỏa <strong>119</strong>
+              </p>
+              <p>
+                <strong>Đại sứ quán Việt Nam tại Bắc Kinh:</strong> Số 32 Guanghua Lu, Chaoyang District — ĐT: <strong>+86-10-65321155</strong> | Đường dây nóng bảo hộ công dân: <strong>+86-131-2036-3638</strong>
+              </p>
+              <p>
+                <strong>Văn phòng Lãnh sự Việt Nam tại Trùng Khánh:</strong> Hỗ trợ trực tiếp khu vực Trùng Khánh &amp; Tứ Xuyên (Thành Đô, Nga Mi Sơn).
+              </p>
+              <p>
+                <strong>Tổng Lãnh sự quán Việt Nam tại Quảng Châu:</strong> Tầng 2, Tòa B, Khách sạn Hoa Kiều, Quảng Châu — ĐT: <strong>+86-20-83305911</strong> | Hotline: <strong>+86-132-4767-0068</strong>
+              </p>
             </div>
           </div>
         </div>
