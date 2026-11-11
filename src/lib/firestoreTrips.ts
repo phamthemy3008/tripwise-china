@@ -38,6 +38,28 @@ export function healStationNamesInTrip(trip: TripDocument): { trip: TripDocument
       const sampleEvt = sampleDay?.events?.[eIdx];
       let newEvt = { ...evt };
 
+      // 0. Sanitize any personal passenger/booking information from cached trips
+      const hasPersonalInfo =
+        /(?:Hộ chiếu|HC|Passport)[:\s]*[A-Z0-9]+/i.test(newEvt.ticket_hint || "") ||
+        /(?:Vé điện tử|e-ticket)[:\s]*\d{3}-\d{10}/i.test(newEvt.ticket_hint || "") ||
+        /(?:PNR|Mã đặt chỗ)[:\s]*[A-Z0-9]+/i.test(newEvt.ticket_hint || "") ||
+        /(?:Đơn Trip\.com)[:\s]*\d+/i.test(newEvt.ticket_hint || "") ||
+        /\b[A-Z]\d{7}\b/.test(newEvt.ticket_hint || "") ||
+        /\b\d{3}-\d{10}\b/.test(newEvt.ticket_hint || "");
+
+      if (hasPersonalInfo) {
+        if (day.day_number === 1) {
+          newEvt.ticket_hint = "Vé máy bay lượt đi: 1,813 RMB (~6,345,500 VND) | China Southern Airlines (SGN - CAN - DYG)";
+        } else if (day.day_number === 16) {
+          newEvt.ticket_hint = "Vé máy bay lượt về: 1,981 RMB (~6,933,500 VND) | Sichuan Airlines 3U3903 (TFU - SGN)";
+        } else {
+          newEvt.ticket_hint = newEvt.ticket_hint
+            ?.replace(/(?:PNR|Mã đặt chỗ|Đơn Trip\.com|Hộ chiếu|HC|Passport|Vé điện tử)[^|]*\|?/gi, "")
+            ?.trim();
+        }
+        evtChanged = true;
+      }
+
       // 1. Fix Day 6: Chongqing railway station -> Chongqing North
       if (
         (newEvt.place_zh === "重庆站" || newEvt.place_name?.includes("Ga Trùng Khánh –")) &&
@@ -130,10 +152,14 @@ export function healStationNamesInTrip(trip: TripDocument): { trip: TripDocument
       }
     }
 
-    // 8. Update Day 1 if lacks official PNR PT1MQ4
+    // 8. Sanitize Day 1 if still contains personal passenger/booking codes
     if (
       day.day_number === 1 &&
-      !day.events?.some((e) => e.ticket_hint?.includes("PT1MQ4") || e.description?.includes("C7548251"))
+      day.events?.some(
+        (e) =>
+          /(?:Hộ chiếu|HC|PNR|Trip\.com|\b[A-Z]\d{7}\b|\b\d{3}-\d{10}\b)/i.test(e.ticket_hint || "") ||
+          /(?:\b[A-Z]\d{7}\b)/i.test(e.description || "")
+      )
     ) {
       if (sampleDay) {
         dayChanged = true;
@@ -141,6 +167,21 @@ export function healStationNamesInTrip(trip: TripDocument): { trip: TripDocument
         return {
           ...day,
           title: sampleDay.title,
+          events: sampleDay.events,
+        };
+      }
+    }
+
+    // 8.1. Sanitize Day 16 if still contains PNR or booking codes
+    if (
+      day.day_number === 16 &&
+      day.events?.some((e) => /(?:PNR|Mã đặt chỗ)/i.test(e.ticket_hint || ""))
+    ) {
+      if (sampleDay) {
+        dayChanged = true;
+        changed = true;
+        return {
+          ...day,
           events: sampleDay.events,
         };
       }

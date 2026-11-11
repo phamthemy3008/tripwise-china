@@ -37,7 +37,7 @@ export const SAMPLE_TRIPS: TripDocument[] = [
             place_zh: "张家界荷花国际机场",
             amap_query: "张家界荷花国际机场",
             transport_hint: "China Southern Airlines CZ6090 (02:25–06:20) & CZ3381 (08:35–10:20); Taxi 12 phút về Atour Hotel",
-            ticket_hint: "PNR: PT1MQ4 | Đơn Trip.com: 1688902167631795 | Hoàng Thị Thương (HC: C7548251, Vé: 784-5239396090) & Phạm Thế Mỹ (HC: C7474611, Vé: 784-5239396091) | Vé lượt đi: 1,813 RMB (~6,345,500 VND)",
+            ticket_hint: "Vé máy bay lượt đi: 1,813 RMB (~6,345,500 VND) | China Southern Airlines (SGN - CAN - DYG)",
             duration_hint: "8 tiếng",
             tips: "Bay đêm, hành lý gửi thẳng đến Trương Gia Giới; nhập cảnh Trung Quốc tại CAN T2.",
             dishes: [
@@ -1482,7 +1482,7 @@ export const SAMPLE_TRIPS: TripDocument[] = [
             place_zh: "胡志明市新山一国际机场",
             amap_query: "成都天府国际机场T1",
             transport_hint: "Sichuan Airlines 3U3903 (20:30 – 23:15) | Bay thẳng về Tân Sơn Nhất",
-            ticket_hint: "Vé máy bay lượt về: 1,981 RMB (~6,933,500 VND) | Mã đặt chỗ PNR: PT1MQ4",
+            ticket_hint: "Vé máy bay lượt về: 1,981 RMB (~6,933,500 VND) | Sichuan Airlines 3U3903 (TFU - SGN)",
             duration_hint: "3.5 tiếng",
             tips: "Nhớ chỉnh lại múi giờ trên điện thoại (Việt Nam chậm hơn Trung Quốc 1 tiếng)."
           }
